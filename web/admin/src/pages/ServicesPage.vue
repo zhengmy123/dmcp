@@ -252,46 +252,22 @@
                         class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors">
                         JSON 编辑
                       </button>
+                      <button type="button" @click="openPasteModal('input')"
+                        class="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
+                        粘贴 JSON 生成
+                      </button>
                     </div>
 
                     <!-- Visual Mode: Input Schema -->
-                    <div v-if="inputSchemaMode === 'visual'" class="space-y-3">
-                      <div v-for="(field, index) in inputFields" :key="index"
-                        class="bg-gray-50 p-3 rounded-lg space-y-2">
-                        <div class="flex gap-2 items-start">
-                          <input v-model="field.name" placeholder="字段名"
-                            class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500"
-                            @change="syncInputFieldsToSchema">
-                          <select v-model="field.type"
-                            class="px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500"
-                            @change="syncInputFieldsToSchema">
-                            <option value="string">字符串</option>
-                            <option value="integer">整数</option>
-                            <option value="number">数字</option>
-                            <option value="boolean">布尔</option>
-                            <option value="array">数组</option>
-                            <option value="object">对象</option>
-                          </select>
-                          <input v-model="field.description" placeholder="描述"
-                            class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500"
-                            @change="syncInputFieldsToSchema">
-                          <label class="flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap pt-1.5">
-                            <input v-model="field.required" type="checkbox"
-                              class="rounded border-gray-300 text-primary-600"
-                              @change="syncInputFieldsToSchema">
-                            必填
-                          </label>
-                          <button type="button" @click="removeInputField(index)"
-                            class="p-1 text-red-400 hover:text-red-600 rounded">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                          </button>
-                        </div>
-                        <div class="flex gap-2">
-                          <input v-model="field.default" placeholder="默认值（可选）"
-                            class="flex-1 px-2 py-1 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-primary-500"
-                            @change="syncInputFieldsToSchema">
-                        </div>
-                      </div>
+                    <div v-if="inputSchemaMode === 'visual'" class="space-y-2">
+                      <SchemaFieldNode
+                        v-for="field in inputFields"
+                        :key="field.id"
+                        :field="field"
+                        :depth="0"
+                        @update="handleInputFieldUpdate"
+                        @delete="handleInputFieldDelete"
+                      />
                       <button type="button" @click="addInputField"
                         class="text-sm text-primary-600 hover:text-primary-700 font-medium">
                         + 添加字段
@@ -329,46 +305,22 @@
                         class="px-3 py-1.5 text-xs font-medium rounded-lg transition-colors">
                         JSON 编辑
                       </button>
+                      <button type="button" @click="openPasteModal('output')"
+                        class="px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
+                        粘贴 JSON 生成
+                      </button>
                     </div>
 
                     <!-- Visual Mode: Output Schema -->
-                    <div v-if="outputSchemaMode === 'visual'" class="space-y-3">
-                      <div v-for="(field, index) in outputFields" :key="index"
-                        class="bg-gray-50 p-3 rounded-lg space-y-2">
-                        <div class="flex gap-2 items-start">
-                          <input v-model="field.name" placeholder="字段名"
-                            class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500"
-                            @change="syncOutputFieldsToSchema">
-                          <select v-model="field.type"
-                            class="px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500"
-                            @change="syncOutputFieldsToSchema">
-                            <option value="string">字符串</option>
-                            <option value="integer">整数</option>
-                            <option value="number">数字</option>
-                            <option value="boolean">布尔</option>
-                            <option value="array">数组</option>
-                            <option value="object">对象</option>
-                          </select>
-                          <input v-model="field.description" placeholder="描述"
-                            class="flex-1 px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500"
-                            @change="syncOutputFieldsToSchema">
-                          <label class="flex items-center gap-1 text-xs text-gray-500 whitespace-nowrap pt-1.5">
-                            <input v-model="field.required" type="checkbox"
-                              class="rounded border-gray-300 text-primary-600"
-                              @change="syncOutputFieldsToSchema">
-                            必填
-                          </label>
-                          <button type="button" @click="removeOutputField(index)"
-                            class="p-1 text-red-400 hover:text-red-600 rounded">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                          </button>
-                        </div>
-                        <div class="flex gap-2">
-                          <input v-model="field.default" placeholder="默认值（可选）"
-                            class="flex-1 px-2 py-1 border border-gray-200 rounded text-xs focus:ring-1 focus:ring-primary-500"
-                            @change="syncOutputFieldsToSchema">
-                        </div>
-                      </div>
+                    <div v-if="outputSchemaMode === 'visual'" class="space-y-2">
+                      <SchemaFieldNode
+                        v-for="field in outputFields"
+                        :key="field.id"
+                        :field="field"
+                        :depth="0"
+                        @update="handleOutputFieldUpdate"
+                        @delete="handleOutputFieldDelete"
+                      />
                       <button type="button" @click="addOutputField"
                         class="text-sm text-primary-600 hover:text-primary-700 font-medium">
                         + 添加字段
@@ -649,6 +601,72 @@
         </div>
       </transition>
     </teleport>
+
+    <!-- Paste JSON Modal -->
+    <teleport to="body">
+      <transition name="fade">
+        <div v-if="showPasteModal" class="fixed inset-0 z-50 overflow-y-auto">
+          <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showPasteModal = false"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden fade-in">
+              <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900">粘贴 JSON 生成 Schema</h3>
+                <button @click="showPasteModal = false" class="text-gray-400 hover:text-gray-600">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="p-6 overflow-y-auto max-h-[calc(90vh-130px)]">
+                <div class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">粘贴 JSON 样本</label>
+                    <textarea v-model="pasteJsonStr" rows="8"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-xs focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder='{"code": 0, "data": {"error": "", "status_code": 200}}'></textarea>
+                    <p v-if="pasteError" class="text-xs text-red-500 mt-1">{{ pasteError }}</p>
+                  </div>
+                  <div class="flex gap-2">
+                    <button @click="parsePasteJson" class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700">
+                      解析
+                    </button>
+                  </div>
+
+                  <!-- Preview -->
+                  <div v-if="pastePreviewFields.length > 0">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">预览生成的字段</label>
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50 max-h-60 overflow-y-auto">
+                      <div v-for="field in pastePreviewFields" :key="field.id">
+                        <div class="text-xs font-mono text-gray-700">
+                          {{ field.name }}: {{ field.type }}
+                          <span v-if="field.children && field.children.length > 0" class="text-gray-400 ml-1">
+                            (含 {{ field.children.length }} 个子字段)
+                          </span>
+                        </div>
+                        <div v-if="field.children" class="ml-4 mt-1">
+                          <div v-for="child in field.children" :key="child.id" class="text-xs font-mono text-gray-500">
+                            └ {{ child.name }}: {{ child.type }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+                <button @click="showPasteModal = false" class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
+                  取消
+                </button>
+                <button @click="applyPasteJson" :disabled="pastePreviewFields.length === 0"
+                  class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                  应用到 {{ pasteTarget === 'input' ? '入参' : '出参' }} Schema
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </teleport>
   </div>
 </template>
 
@@ -658,6 +676,16 @@ import { useServicesStore } from '@/stores/services'
 import { servicesApi } from '@/api/services'
 import VueJsonPretty from 'vue-json-pretty'
 import 'vue-json-pretty/lib/styles.css'
+import SchemaFieldNode from '@/components/SchemaFieldNode.vue'
+import {
+  fieldsToSchema,
+  schemaToFields,
+  parseJSONToFields,
+  createField,
+  removeFieldById,
+  updateFieldById,
+  type SchemaField,
+} from '@/utils/schemaBuilder'
 
 const servicesStore = useServicesStore()
 const showToast = inject('showToast')
@@ -678,6 +706,13 @@ const outputSchemaError = ref('')
 // Visual schema fields
 const inputFields = ref([])
 const outputFields = ref([])
+
+// Paste modal state
+const showPasteModal = ref(false)
+const pasteTarget = ref('output')
+const pasteJsonStr = ref('')
+const pastePreviewFields = ref([])
+const pasteError = ref('')
 
 // Transform script toggles
 const requestTransformEnabled = ref(false)
@@ -782,91 +817,63 @@ const form = reactive({
 
 // ---- Schema Visual Editor Helpers ----
 const addInputField = () => {
-  inputFields.value.push({ name: '', type: 'string', description: '', required: false, default: '' })
-}
-const removeInputField = (index) => {
-  inputFields.value.splice(index, 1)
-  syncInputFieldsToSchema()
+  inputFields.value = [...inputFields.value, createField()]
 }
 const addOutputField = () => {
-  outputFields.value.push({ name: '', type: 'string', description: '', required: false, default: '' })
+  outputFields.value = [...outputFields.value, createField()]
 }
-const removeOutputField = (index) => {
-  outputFields.value.splice(index, 1)
-  syncOutputFieldsToSchema()
+
+// 处理字段更新
+const handleInputFieldUpdate = (id, updates) => {
+  inputFields.value = updateFieldById(inputFields.value, id, updates)
+}
+const handleOutputFieldUpdate = (id, updates) => {
+  outputFields.value = updateFieldById(outputFields.value, id, updates)
+}
+
+// 处理字段删除
+const handleInputFieldDelete = (id) => {
+  inputFields.value = removeFieldById(inputFields.value, id)
+}
+const handleOutputFieldDelete = (id) => {
+  outputFields.value = removeFieldById(outputFields.value, id)
+}
+
+// 粘贴解析相关
+const openPasteModal = (target) => {
+  pasteTarget.value = target
+  pasteJsonStr.value = ''
+  pasteError.value = ''
+  pastePreviewFields.value = []
+  showPasteModal.value = true
+}
+
+const parsePasteJson = () => {
+  pasteError.value = ''
+  pastePreviewFields.value = []
+  try {
+    const parsed = JSON.parse(pasteJsonStr.value)
+    pastePreviewFields.value = parseJSONToFields(parsed)
+  } catch (e) {
+    pasteError.value = 'JSON 格式不正确: ' + e.message
+  }
+}
+
+const applyPasteJson = () => {
+  if (pasteTarget.value === 'input') {
+    inputFields.value = pastePreviewFields.value
+  } else {
+    outputFields.value = pastePreviewFields.value
+  }
+  showPasteModal.value = false
 }
 
 // Visual fields -> Schema JSON
 const syncInputFieldsToSchema = () => {
-  const schema = fieldsToSchema(inputFields.value)
-  inputSchemaStr.value = JSON.stringify(schema, null, 2)
+  inputSchemaStr.value = JSON.stringify(fieldsToSchema(inputFields.value), null, 2)
 }
 const syncOutputFieldsToSchema = () => {
-  const schema = fieldsToSchema(outputFields.value)
-  outputSchemaStr.value = JSON.stringify(schema, null, 2)
-}
-
-const fieldsToSchema = (fields) => {
-  const properties = {}
-  const required = []
-  fields.forEach(f => {
-    if (!f.name) return
-    const prop = {
-      type: f.type,
-      ...(f.description ? { description: f.description } : {}),
-    }
-    // Handle default value based on type
-    if (f.default !== '' && f.default !== undefined && f.default !== null) {
-      switch (f.type) {
-        case 'integer':
-        case 'number': {
-          const num = Number(f.default)
-          if (!isNaN(num)) prop.default = num
-          break
-        }
-        case 'boolean':
-          if (f.default === 'true' || f.default === true) prop.default = true
-          else if (f.default === 'false' || f.default === false) prop.default = false
-          break
-        case 'array':
-        case 'object':
-          try { prop.default = JSON.parse(f.default) } catch { /* ignore invalid JSON */ }
-          break
-        default:
-          prop.default = f.default
-      }
-    }
-    properties[f.name] = prop
-    if (f.required) required.push(f.name)
-  })
-  return {
-    type: 'object',
-    properties,
-    ...(required.length ? { required } : {}),
-  }
-}
-
-// Schema JSON -> Visual fields
-const schemaToFields = (schema) => {
-  if (!schema || !schema.properties) return []
-  const required = schema.required || []
-  return Object.entries(schema.properties).map(([name, prop]) => {
-    let defaultVal = ''
-    if (prop.default !== undefined && prop.default !== null) {
-      if (typeof prop.default === 'object') {
-        defaultVal = JSON.stringify(prop.default)
-      } else {
-        defaultVal = String(prop.default)
-      }
-    }
-    return {
-      name,
-      type: prop.type || 'string',
-      description: prop.description || '',
-      required: required.includes(name),
-      default: defaultVal,
-    }
-  })
+  outputSchemaStr.value = JSON.stringify(fieldsToSchema(outputFields.value), null, 2)
 }
 
 const switchToJsonMode = (target) => {
