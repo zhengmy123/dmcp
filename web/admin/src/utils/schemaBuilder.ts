@@ -101,7 +101,21 @@ export function fieldsToSchema(fields: SchemaField[]): any {
 
 // schemaToFields: JSON Schema → 嵌套字段树 (递归)
 export function schemaToFields(schema: any, parentId = ''): SchemaField[] {
-  if (!schema || !schema.properties) {
+  if (!schema) {
+    return [];
+  }
+
+  // 处理错误的格式：当properties直接包含type和properties字段时
+  if (schema.properties && typeof schema.properties === 'object') {
+    const props = schema.properties;
+    // 检查是否是错误格式（properties中包含type和properties字段）
+    if (props.type === 'object' && props.properties) {
+      // 跳过错误的type字段，直接处理嵌套的properties
+      return schemaToFields(props, parentId);
+    }
+  }
+
+  if (!schema.properties) {
     return [];
   }
 
