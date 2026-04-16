@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Logs
+logs/*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test files
+**/*_test.go
+**/*_test.sh
+
+# Documentation
+*.md
+!README.md
+docs/*.md
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Environment
+.env
+.env.*
+.env.local
+
+# Build artifacts
+mcp-server
+*.exe

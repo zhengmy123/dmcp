@@ -1,0 +1,12 @@
+---
+description: 
+alwaysApply: true
+enabled: true
+updatedAt: 2026-04-15T13:24:05.170Z
+provider: 
+---
+
+1、单测都移动到test目录下
+2、项目遵循ddd模式
+3、项目中查询数据库golang的都使用gorm
+4、函数、方法出入参优先使用结构体，
