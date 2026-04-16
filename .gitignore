@@ -25,4 +25,4 @@ __debug_bin*
 
 # web
 web/admin/dist
-web/admin/node_modules
+web/admin/node_modules.worktrees/
