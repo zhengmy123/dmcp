@@ -44,12 +44,8 @@ export function formatDefaultValue(value: any): string {
   return String(value);
 }
 
-// fieldsToSchema: 嵌套字段树 → JSON Schema (递归)
-export function fieldsToSchema(fields: SchemaField[]): any {
-  if (!fields || fields.length === 0) {
-    return { type: 'object', properties: {} };
-  }
-
+// 内部辅助函数：只返回 properties 对象（不包含 type 和其他外层结构）
+function fieldsToProperties(fields: SchemaField[]): { properties: Record<string, any>, required: string[] } {
   const properties: Record<string, any> = {};
   const required: string[] = [];
 
@@ -60,19 +56,27 @@ export function fieldsToSchema(fields: SchemaField[]): any {
 
     switch (field.type) {
       case 'object':
+        const objResult = fieldsToProperties(field.children || []);
         propSchema = {
           type: 'object',
-          properties: fieldsToSchema(field.children || []),
+          properties: objResult.properties,
         };
+        if (objResult.required.length > 0) {
+          propSchema.required = objResult.required;
+        }
         break;
       case 'array':
+        const arrResult = fieldsToProperties(field.children || []);
         propSchema = {
           type: 'array',
           items: {
             type: 'object',
-            properties: fieldsToSchema(field.children || []),
+            properties: arrResult.properties,
           },
         };
+        if (arrResult.required.length > 0) {
+          propSchema.items.required = arrResult.required;
+        }
         break;
       default:
         propSchema = { type: field.type };
@@ -92,10 +96,21 @@ export function fieldsToSchema(fields: SchemaField[]): any {
     }
   }
 
+  return { properties, required };
+}
+
+// fieldsToSchema: 嵌套字段树 → JSON Schema (递归)
+export function fieldsToSchema(fields: SchemaField[]): any {
+  if (!fields || fields.length === 0) {
+    return { type: 'object', properties: {} };
+  }
+
+  const result = fieldsToProperties(fields);
+
   return {
     type: 'object',
-    properties,
-    ...(required.length > 0 ? { required } : {}),
+    properties: result.properties,
+    ...(result.required.length > 0 ? { required: result.required } : {}),
   };
 }
 
