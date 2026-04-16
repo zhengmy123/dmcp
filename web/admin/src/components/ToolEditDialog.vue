@@ -436,6 +436,16 @@ const syncOutputFromService = (service) => {
   if (schema && schema.properties) {
     // 提取所有字段（包括嵌套）
     outputSchemaFields.value = extractSchemaFields(schema)
+    
+    // 完整映射模式下，自动创建映射
+    if (outputMappingMode.value === 'full') {
+      outputMappings.value = outputSchemaFields.value.map(field => ({
+        source_field: field,
+        target_field: field,
+        value_type: 'field',
+        default_value: ''
+      }))
+    }
   }
 }
 
@@ -539,7 +549,8 @@ const handleSubmit = async () => {
     vauth_key: form.vauth_key,
     service_id: form.service_id,
     parameters: inputParams.value.filter(p => p.name),
-    output_mapping: outputMappings.value.filter(m => m.source_field && m.target_field),
+    output_mapping: outputMappings.value.filter(m => m.target_field),
+    output_mapping_mode: outputMappingMode.value,
     output_schema: outputSchema
   }
 
