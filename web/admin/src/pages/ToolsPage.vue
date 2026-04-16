@@ -16,6 +16,15 @@
           </svg>
           刷新
         </button>
+        <button
+          @click="openCreateToolDialog"
+          class="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 btn-transition"
+        >
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+          </svg>
+          添加工具
+        </button>
       </div>
     </div>
 
@@ -143,15 +152,26 @@
         </div>
       </transition>
     </teleport>
+
+    <!-- Tool Edit Dialog -->
+    <ToolEditDialog
+      :visible="showToolDialog"
+      :editing-tool="editingTool"
+      @close="showToolDialog = false"
+      @saved="handleToolSaved"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useToolsStore } from '@/stores/tools'
+import ToolEditDialog from '@/components/ToolEditDialog.vue'
 
 const toolsStore = useToolsStore()
 const selectedTool = ref(null)
+const showToolDialog = ref(false)
+const editingTool = ref(null)
 
 const refreshTools = () => {
   toolsStore.fetchTools()
@@ -159,6 +179,21 @@ const refreshTools = () => {
 
 const formatJson = (obj) => {
   return JSON.stringify(obj, null, 2)
+}
+
+const openCreateToolDialog = () => {
+  editingTool.value = null
+  showToolDialog.value = true
+}
+
+const openEditToolDialog = (tool) => {
+  editingTool.value = tool
+  showToolDialog.value = true
+}
+
+const handleToolSaved = async (data) => {
+  showToolDialog.value = false
+  await toolsStore.fetchToolsForAdmin()
 }
 
 onMounted(() => {

@@ -100,7 +100,7 @@ func main() {
 		logger.String("tool_routes", "/mcp/{vauth_key}/{tool_name}"),
 	)
 
-	startHTTPServer(ctx, cfg, registry, groupMCP, authService, httpServiceManager, serviceStore, userService, jwtManager, appLogger)
+	startHTTPServer(ctx, cfg, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, userService, jwtManager, appLogger)
 }
 
 func buildStore(cfg config.Config, log logger.Logger) (tooldef.Store, func(), error) {
@@ -338,6 +338,7 @@ func startHTTPServer(
 	authService *service.AuthService,
 	httpServiceManager *service.HTTPServiceManager,
 	serviceStore repository.ServiceStore,
+	gormDB *gorm.DB,
 	userService *service.UserService,
 	jwtManager *auth.JWTManager,
 	log logger.Logger,
@@ -354,7 +355,7 @@ func startHTTPServer(
 
 	engine.RedirectTrailingSlash = false
 
-	httpAPI.RegisterRoutes(engine, registry, groupMCP, authService, httpServiceManager, serviceStore, jwtManager, log)
+	httpAPI.RegisterRoutes(engine, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, jwtManager, log)
 
 	if userService != nil && jwtManager != nil {
 		httpAPI.RegisterUserAuthRoutes(engine, userService, jwtManager)

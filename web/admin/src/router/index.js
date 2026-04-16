@@ -45,6 +45,12 @@ const routes = [
         name: 'Settings',
         component: () => import('@/pages/SettingsPage.vue'),
         meta: { title: '系统设置', requiresAuth: true }
+      },
+      {
+        path: 'mcp-servers',
+        name: 'MCPServers',
+        component: () => import('@/pages/MCPServersPage.vue'),
+        meta: { title: 'MCP Server 管理', requiresAuth: true }
       }
     ]
   }

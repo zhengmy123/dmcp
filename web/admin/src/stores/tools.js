@@ -35,12 +35,81 @@ export const useToolsStore = defineStore('tools', () => {
     }
   }
 
+  // ========== 工具管理功能 ==========
+
+  // 获取工具列表（管理）
+  const fetchToolsForAdmin = async () => {
+    loading.value = true
+    error.value = null
+    try {
+      const data = await toolsApi.list()
+      tools.value = data.tools || []
+    } catch (e) {
+      error.value = e.message
+      tools.value = []
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 创建工具
+  const createTool = async (data) => {
+    loading.value = true
+    error.value = null
+    try {
+      await toolsApi.create(data)
+      await fetchToolsForAdmin()
+      return true
+    } catch (e) {
+      error.value = e.message
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 更新工具
+  const updateTool = async (id, data) => {
+    loading.value = true
+    error.value = null
+    try {
+      await toolsApi.update(id, data)
+      await fetchToolsForAdmin()
+      return true
+    } catch (e) {
+      error.value = e.message
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 删除工具
+  const deleteTool = async (id) => {
+    loading.value = true
+    error.value = null
+    try {
+      await toolsApi.delete(id)
+      await fetchToolsForAdmin()
+      return true
+    } catch (e) {
+      error.value = e.message
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     tools,
     loading,
     error,
     groupedTools,
     serviceCount,
-    fetchTools
+    fetchTools,
+    fetchToolsForAdmin,
+    createTool,
+    updateTool,
+    deleteTool
   }
 })

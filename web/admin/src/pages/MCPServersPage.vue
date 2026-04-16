@@ -1,0 +1,375 @@
+<template>
+  <div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">MCP Server 管理</h2>
+        <p class="text-sm text-gray-500 mt-1">管理 MCP Server 配置及关联工具</p>
+      </div>
+      <div class="flex items-center space-x-2">
+        <button
+          @click="refreshServers"
+          class="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+        >
+          <svg class="w-4 h-4 mr-1.5" :class="{ 'animate-spin': mcpServersStore.loading }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+          刷新
+        </button>
+        <button
+          @click="openCreateModal"
+          class="inline-flex items-center px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 btn-transition"
+        >
+          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+          </svg>
+          创建 Server
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div v-if="mcpServersStore.loading" class="text-center py-12">
+      <div class="loading-spinner mx-auto"></div>
+      <p class="text-gray-500 mt-2">加载中...</p>
+    </div>
+
+    <!-- Empty State -->
+    <div v-else-if="mcpServersStore.servers.length === 0" class="text-center py-12 bg-white rounded-xl border border-gray-200">
+      <svg class="w-12 h-12 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+      </svg>
+      <p class="text-gray-500">暂无 MCP Server</p>
+      <button @click="openCreateModal" class="mt-4 text-primary-600 hover:text-primary-700 text-sm font-medium">
+        创建第一个 Server
+      </button>
+    </div>
+
+    <!-- Servers Table -->
+    <div v-else class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+          <tr>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VAuth Key</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">工具数</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">启用状态</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">描述</th>
+            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr v-for="server in mcpServersStore.servers" :key="server.id" class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap">
+              <div class="flex items-center">
+                <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center mr-3">
+                  <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                  </svg>
+                </div>
+                <span class="font-medium text-gray-900">{{ server.name }}</span>
+              </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <code class="text-sm text-gray-600 bg-gray-100 px-2 py-0.5 rounded">{{ server.vauth_key }}</code>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span class="px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
+                {{ server.tools?.length || 0 }} 个工具
+              </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span
+                class="px-2.5 py-1 text-xs font-medium rounded-full"
+                :class="server.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+              >
+                {{ server.enabled ? '启用' : '禁用' }}
+              </span>
+            </td>
+            <td class="px-6 py-4">
+              <span class="text-sm text-gray-500 line-clamp-1">{{ server.description || '无描述' }}</span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+              <div class="flex items-center justify-end space-x-1">
+                <button
+                  @click="openToolsModal(server)"
+                  class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="管理工具"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                  </svg>
+                </button>
+                <button
+                  @click="openEditModal(server)"
+                  class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                  title="编辑"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                  </svg>
+                </button>
+                <button
+                  @click="handleDelete(server)"
+                  class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="删除"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Create/Edit Modal -->
+    <teleport to="body">
+      <transition name="fade">
+        <div v-if="showModal" class="fixed inset-0 z-50 overflow-y-auto">
+          <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showModal = false"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden fade-in">
+              <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900">{{ editingServer ? '编辑 Server' : '创建 Server' }}</h3>
+                <button @click="showModal = false" class="text-gray-400 hover:text-gray-600">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="p-6 overflow-y-auto max-h-[calc(90vh-130px)]">
+                <form @submit.prevent="handleSubmit" class="space-y-4">
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">名称 *</label>
+                    <input v-model="form.name" type="text" required
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="MCP Server 名称">
+                  </div>
+
+                  <div v-if="editingServer">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">VAuth Key</label>
+                    <input v-model="form.vauth_key" type="text" disabled
+                      class="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-gray-500">
+                    <p class="text-xs text-gray-400 mt-1">唯一标识，创建后不可修改</p>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">描述</label>
+                    <textarea v-model="form.description" rows="2"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="可选描述信息"></textarea>
+                  </div>
+
+                  <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">HTTP 服务 URL</label>
+                    <input v-model="form.http_server_url" type="url"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="https://api.example.com/mcp">
+                    <p class="text-xs text-gray-400 mt-1">可选，连接外部 MCP Server</p>
+                  </div>
+
+                  <div class="flex items-center">
+                    <label class="flex items-center">
+                      <input v-model="form.enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                      <span class="ml-2 text-sm text-gray-700">启用 Server</span>
+                    </label>
+                  </div>
+
+                  <div class="flex justify-end space-x-3 pt-4">
+                    <button type="button" @click="showModal = false"
+                      class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
+                      取消
+                    </button>
+                    <button type="submit" :disabled="mcpServersStore.loading"
+                      class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                      {{ mcpServersStore.loading ? '保存中...' : '保存' }}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </teleport>
+
+    <!-- Tools Management Modal -->
+    <teleport to="body">
+      <transition name="fade">
+        <div v-if="showToolsModal" class="fixed inset-0 z-50 overflow-y-auto">
+          <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showToolsModal = false"></div>
+            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden fade-in">
+              <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <h3 class="text-lg font-semibold text-gray-900">管理工具</h3>
+                  <span class="px-2.5 py-1 text-xs font-medium bg-primary-100 text-primary-700 rounded-full">
+                    {{ selectedServer?.name }}
+                  </span>
+                </div>
+                <button @click="showToolsModal = false" class="text-gray-400 hover:text-gray-600">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+              <div class="p-6 overflow-y-auto max-h-[calc(90vh-130px)]">
+                <div v-if="allTools.length === 0" class="text-center py-8">
+                  <p class="text-gray-500">暂无可关联的工具</p>
+                  <p class="text-sm text-gray-400 mt-1">请先在"工具定义"中创建工具</p>
+                </div>
+                <div v-else class="space-y-4">
+                  <div class="flex items-center justify-between mb-3">
+                    <p class="text-sm text-gray-600">选择要关联到该 Server 的工具：</p>
+                    <button @click="saveTools" :disabled="savingTools"
+                      class="px-3 py-1.5 text-xs font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+                      {{ savingTools ? '保存中...' : '保存更改' }}
+                    </button>
+                  </div>
+                  <div class="grid grid-cols-2 gap-3">
+                    <label
+                      v-for="tool in allTools"
+                      :key="tool.name"
+                      class="flex items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="selectedToolNames.includes(tool.name)"
+                        @change="toggleTool(tool.name)"
+                        class="rounded border-gray-300 text-primary-600 mt-0.5"
+                      >
+                      <div class="ml-2">
+                        <span class="text-sm font-medium text-gray-900">{{ tool.name }}</span>
+                        <p class="text-xs text-gray-500 line-clamp-1">{{ tool.description || '无描述' }}</p>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </transition>
+    </teleport>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useMCPServersStore } from '@/stores/mcpServers'
+import { useToolsStore } from '@/stores/tools'
+
+const mcpServersStore = useMCPServersStore()
+const toolsStore = useToolsStore()
+
+const showModal = ref(false)
+const editingServer = ref(null)
+const showToolsModal = ref(false)
+const selectedServer = ref(null)
+const selectedToolNames = ref([])
+const savingTools = ref(false)
+
+const form = reactive({
+  name: '',
+  vauth_key: '',
+  description: '',
+  http_server_url: '',
+  enabled: true
+})
+
+const allTools = computed(() => toolsStore.tools || [])
+
+const refreshServers = () => {
+  mcpServersStore.fetchServers()
+}
+
+const openCreateModal = () => {
+  editingServer.value = null
+  Object.assign(form, {
+    name: '',
+    vauth_key: '', // 创建时留空，后端自动生成
+    description: '',
+    http_server_url: '',
+    enabled: true
+  })
+  showModal.value = true
+}
+
+const openEditModal = (server) => {
+  editingServer.value = server
+  Object.assign(form, {
+    name: server.name,
+    vauth_key: server.vauth_key,
+    description: server.description || '',
+    http_server_url: server.http_server_url || '',
+    enabled: server.enabled
+  })
+  showModal.value = true
+}
+
+const handleSubmit = async () => {
+  try {
+    if (editingServer.value) {
+      await mcpServersStore.updateServer(editingServer.value.id, { ...form })
+    } else {
+      await mcpServersStore.createServer({ ...form })
+    }
+    showModal.value = false
+  } catch (e) {
+    console.error('保存失败:', e)
+  }
+}
+
+const handleDelete = async (server) => {
+  if (!confirm(`确定要删除 Server "${server.name}" 吗？`)) return
+  try {
+    await mcpServersStore.deleteServer(server.id)
+  } catch (e) {
+    console.error('删除失败:', e)
+  }
+}
+
+const openToolsModal = async (server) => {
+  selectedServer.value = server
+  selectedToolNames.value = [...(server.tools || [])]
+  await toolsStore.fetchTools()
+  showToolsModal.value = true
+}
+
+const toggleTool = (toolName) => {
+  const index = selectedToolNames.value.indexOf(toolName)
+  if (index === -1) {
+    selectedToolNames.value.push(toolName)
+  } else {
+    selectedToolNames.value.splice(index, 1)
+  }
+}
+
+const saveTools = async () => {
+  savingTools.value = true
+  try {
+    const currentTools = selectedServer.value.tools || []
+    const toAdd = selectedToolNames.value.filter(t => !currentTools.includes(t))
+    const toRemove = currentTools.filter(t => !selectedToolNames.value.includes(t))
+
+    for (const toolName of toAdd) {
+      await mcpServersStore.addToolsToServer(selectedServer.value.id, [toolName])
+    }
+    for (const toolName of toRemove) {
+      await mcpServersStore.removeToolFromServer(selectedServer.value.id, toolName)
+    }
+    showToolsModal.value = false
+  } catch (e) {
+    console.error('保存工具失败:', e)
+  } finally {
+    savingTools.value = false
+  }
+}
+
+onMounted(() => {
+  mcpServersStore.fetchServers()
+})
+</script>

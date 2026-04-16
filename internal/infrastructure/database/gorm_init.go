@@ -39,5 +39,7 @@ func AutoMigrate(db *gorm.DB) error {
 		&model.ToolDefinition{},
 		&model.HTTPService{},
 		&model.ServiceMapping{},
+		&model.MCPServer{},
+		&model.TokenServerBinding{},
 	)
 }
