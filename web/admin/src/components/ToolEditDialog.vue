@@ -150,7 +150,7 @@
                     
                     <div v-if="outputMappings.length === 0" class="text-center py-6 bg-gray-50 rounded-lg">
                       <p class="text-sm text-gray-500">暂无出参映射</p>
-                      <button type="button" @click="syncOutputFromService" class="mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium">
+                      <button type="button" @click="handleSyncOutputFromService" class="mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium">
                         从服务同步
                       </button>
                     </div>
@@ -437,6 +437,19 @@ const handleOutputFieldDelete = (id) => {
 // 添加出参字段
 const addOutputField = () => {
   outputFields.value = [...outputFields.value, createField()]
+}
+
+// 处理从服务同步出参
+const handleSyncOutputFromService = async () => {
+  if (form.service_id) {
+    try {
+      const response = await servicesApi.getService(form.service_id)
+      const service = response.data
+      syncOutputFromService(service)
+    } catch (error) {
+      console.error('获取服务信息失败:', error)
+    }
+  }
 }
 
 const handleSubmit = async () => {
