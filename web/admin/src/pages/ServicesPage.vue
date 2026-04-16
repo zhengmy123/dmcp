@@ -684,7 +684,6 @@ import {
   createField,
   removeFieldById,
   updateFieldById,
-  type SchemaField,
 } from '@/utils/schemaBuilder'
 
 const servicesStore = useServicesStore()
