@@ -400,7 +400,7 @@ const onServerChange = async () => {
   if (form.vauth_key) {
     // 使用简化版接口获取服务列表
     try {
-      const response = await servicesApi.getServicesSimple()
+      const response = await servicesApi.getServicesSimple(form.vauth_key)
       servicesStore.services = response.data
     } catch (error) {
       console.error('获取服务列表失败:', error)
