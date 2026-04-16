@@ -131,22 +131,22 @@
                       出参映射
                     </h4>
                     <div class="flex gap-2">
-                      <button type="button" @click="switchToOutputSchemaMode('mapping')"
-                        :class="outputSchemaMode === 'mapping' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                      <button type="button" @click="outputMappingMode = 'full'"
+                        :class="outputMappingMode === 'full' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
                         class="px-3 py-1 text-xs font-medium rounded-lg transition-colors">
-                        字段映射
+                        完整映射
                       </button>
-                      <button type="button" @click="switchToOutputSchemaMode('visual')"
-                        :class="outputSchemaMode === 'visual' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                      <button type="button" @click="outputMappingMode = 'custom'"
+                        :class="outputMappingMode === 'custom' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
                         class="px-3 py-1 text-xs font-medium rounded-lg transition-colors">
-                        可视化编辑
+                        自定义字段
                       </button>
                     </div>
                   </div>
                   
-                  <!-- 字段映射模式 -->
-                  <div v-if="outputSchemaMode === 'mapping'">
-                    <p class="text-xs text-gray-500">选择 HTTP 服务的 OutputSchema 字段，配置目标字段名</p>
+                  <!-- 完整映射模式 -->
+                  <div v-if="outputMappingMode === 'full'">
+                    <p class="text-xs text-gray-500">完整映射 HTTP 服务的 OutputSchema 字段，字段不可修改</p>
                     
                     <div v-if="outputMappings.length === 0" class="text-center py-6 bg-gray-50 rounded-lg">
                       <p class="text-sm text-gray-500">暂无出参映射</p>
@@ -161,8 +161,8 @@
                         <div class="flex gap-2 items-start">
                           <div class="flex-1">
                             <label class="block text-xs text-gray-500 mb-1">源字段</label>
-                            <select v-model="mapping.source_field"
-                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500">
+                            <select v-model="mapping.source_field" disabled
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-gray-100 text-gray-500">
                               <option value="">选择源字段</option>
                               <option v-for="field in outputSchemaFields" :key="field" :value="field">
                                 {{ field }}
@@ -171,6 +171,31 @@
                           </div>
                           <div class="flex-1">
                             <label class="block text-xs text-gray-500 mb-1">目标字段</label>
+                            <input v-model="mapping.target_field" placeholder="目标字段名" disabled
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm bg-gray-100 text-gray-500">
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- 自定义字段模式 -->
+                  <div v-else>
+                    <p class="text-xs text-gray-500">自定义出参字段，值来源可选择：引用 HTTP 服务字段 或 默认值</p>
+                    
+                    <div v-if="outputMappings.length === 0" class="text-center py-6 bg-gray-50 rounded-lg">
+                      <p class="text-sm text-gray-500">暂无出参映射</p>
+                      <button type="button" @click="addOutputMapping" class="mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium">
+                        + 添加字段
+                      </button>
+                    </div>
+                    
+                    <div v-else class="space-y-3">
+                      <div v-for="(mapping, index) in outputMappings" :key="index"
+                        class="bg-gray-50 p-3 rounded-lg space-y-2">
+                        <div class="flex gap-2 items-start">
+                          <div class="flex-1">
+                            <label class="block text-xs text-gray-500 mb-1">目标字段名 *</label>
                             <input v-model="mapping.target_field" placeholder="目标字段名"
                               class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500">
                           </div>
@@ -179,10 +204,45 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                           </button>
                         </div>
+                        
+                        <div class="flex gap-2 items-start">
+                          <div class="flex-1">
+                            <label class="block text-xs text-gray-500 mb-1">值来源</label>
+                            <select v-model="mapping.value_type" @change="onMappingValueTypeChange(mapping)"
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500">
+                              <option value="field">引用 HTTP 服务字段</option>
+                              <option value="default">默认值</option>
+                            </select>
+                          </div>
+                        </div>
+                        
+                        <!-- 引用字段模式 -->
+                        <div v-if="mapping.value_type === 'field'" class="flex gap-2 items-start">
+                          <div class="flex-1">
+                            <label class="block text-xs text-gray-500 mb-1">选择源字段</label>
+                            <select v-model="mapping.source_field"
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500">
+                              <option value="">选择源字段</option>
+                              <option v-for="field in outputSchemaFields" :key="field" :value="field">
+                                {{ field }}
+                              </option>
+                            </select>
+                          </div>
+                        </div>
+                        
+                        <!-- 默认值模式 -->
+                        <div v-else class="flex gap-2 items-start">
+                          <div class="flex-1">
+                            <label class="block text-xs text-gray-500 mb-1">默认值</label>
+                            <input v-model="mapping.default_value" placeholder="输入默认值"
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500">
+                          </div>
+                        </div>
                       </div>
+                      
                       <button type="button" @click="addOutputMapping"
                         class="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                        + 添加映射
+                        + 添加字段
                       </button>
                     </div>
                   </div>
@@ -403,6 +463,15 @@ const addOutputMapping = () => {
 
 const removeOutputMapping = (index) => {
   outputMappings.value.splice(index, 1)
+}
+
+// 处理值类型变化
+const onMappingValueTypeChange = (mapping) => {
+  if (mapping.value_type === 'field') {
+    mapping.default_value = ''
+  } else {
+    mapping.source_field = ''
+  }
 }
 
 // 切换出参编辑模式
