@@ -125,48 +125,86 @@
 
                 <!-- Output Mapping -->
                 <div class="space-y-4 pt-4 border-t border-gray-100">
-                  <h4 class="text-sm font-semibold text-gray-800 flex items-center">
-                    <svg class="w-4 h-4 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
-                    出参映射
-                  </h4>
-                  <p class="text-xs text-gray-500">选择 HTTP 服务的 OutputSchema 字段，配置目标字段名</p>
-
-                  <div v-if="outputMappings.length === 0" class="text-center py-6 bg-gray-50 rounded-lg">
-                    <p class="text-sm text-gray-500">暂无出参映射</p>
-                    <button type="button" @click="syncOutputFromService" class="mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium">
-                      从服务同步
-                    </button>
-                  </div>
-
-                  <div v-else class="space-y-3">
-                    <div v-for="(mapping, index) in outputMappings" :key="index"
-                      class="bg-gray-50 p-3 rounded-lg space-y-2">
-                      <div class="flex gap-2 items-start">
-                        <div class="flex-1">
-                          <label class="block text-xs text-gray-500 mb-1">源字段</label>
-                          <select v-model="mapping.source_field"
-                            class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500">
-                            <option value="">选择源字段</option>
-                            <option v-for="field in outputSchemaFields" :key="field" :value="field">
-                              {{ field }}
-                            </option>
-                          </select>
-                        </div>
-                        <div class="flex-1">
-                          <label class="block text-xs text-gray-500 mb-1">目标字段</label>
-                          <input v-model="mapping.target_field" placeholder="目标字段名"
-                            class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500">
-                        </div>
-                        <button type="button" @click="removeOutputMapping(index)"
-                          class="p-1 text-red-400 hover:text-red-600 rounded mt-5">
-                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                        </button>
-                      </div>
+                  <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-gray-800 flex items-center">
+                      <svg class="w-4 h-4 mr-1.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                      出参映射
+                    </h4>
+                    <div class="flex gap-2">
+                      <button type="button" @click="switchToOutputSchemaMode('mapping')"
+                        :class="outputSchemaMode === 'mapping' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                        class="px-3 py-1 text-xs font-medium rounded-lg transition-colors">
+                        字段映射
+                      </button>
+                      <button type="button" @click="switchToOutputSchemaMode('visual')"
+                        :class="outputSchemaMode === 'visual' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                        class="px-3 py-1 text-xs font-medium rounded-lg transition-colors">
+                        可视化编辑
+                      </button>
                     </div>
-                    <button type="button" @click="addOutputMapping"
-                      class="text-sm text-primary-600 hover:text-primary-700 font-medium">
-                      + 添加映射
-                    </button>
+                  </div>
+                  
+                  <!-- 字段映射模式 -->
+                  <div v-if="outputSchemaMode === 'mapping'">
+                    <p class="text-xs text-gray-500">选择 HTTP 服务的 OutputSchema 字段，配置目标字段名</p>
+                    
+                    <div v-if="outputMappings.length === 0" class="text-center py-6 bg-gray-50 rounded-lg">
+                      <p class="text-sm text-gray-500">暂无出参映射</p>
+                      <button type="button" @click="syncOutputFromService" class="mt-2 text-xs text-primary-600 hover:text-primary-700 font-medium">
+                        从服务同步
+                      </button>
+                    </div>
+                    
+                    <div v-else class="space-y-3">
+                      <div v-for="(mapping, index) in outputMappings" :key="index"
+                        class="bg-gray-50 p-3 rounded-lg space-y-2">
+                        <div class="flex gap-2 items-start">
+                          <div class="flex-1">
+                            <label class="block text-xs text-gray-500 mb-1">源字段</label>
+                            <select v-model="mapping.source_field"
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500">
+                              <option value="">选择源字段</option>
+                              <option v-for="field in outputSchemaFields" :key="field" :value="field">
+                                {{ field }}
+                              </option>
+                            </select>
+                          </div>
+                          <div class="flex-1">
+                            <label class="block text-xs text-gray-500 mb-1">目标字段</label>
+                            <input v-model="mapping.target_field" placeholder="目标字段名"
+                              class="w-full px-2 py-1.5 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-primary-500">
+                          </div>
+                          <button type="button" @click="removeOutputMapping(index)"
+                            class="p-1 text-red-400 hover:text-red-600 rounded mt-5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                          </button>
+                        </div>
+                      </div>
+                      <button type="button" @click="addOutputMapping"
+                        class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                        + 添加映射
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <!-- 可视化编辑模式 -->
+                  <div v-else>
+                    <p class="text-xs text-gray-500">可视化编辑出参 schema 结构</p>
+                    
+                    <div class="space-y-2">
+                      <SchemaFieldNode
+                        v-for="field in outputFields"
+                        :key="field.id"
+                        :field="field"
+                        :depth="0"
+                        @update="handleOutputFieldUpdate"
+                        @delete="handleOutputFieldDelete"
+                      />
+                      <button type="button" @click="addOutputField"
+                        class="text-sm text-primary-600 hover:text-primary-700 font-medium">
+                        + 添加字段
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -194,6 +232,16 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { useMCPServersStore } from '@/stores/mcpServers'
 import { useServicesStore } from '@/stores/services'
+import { servicesApi } from '@/api/services'
+import { extractSchemaFields, createNestedObject, mergeNestedObjects } from '@/utils/schemaHelper'
+import SchemaFieldNode from '@/components/SchemaFieldNode.vue'
+import {
+  fieldsToSchema,
+  schemaToFields,
+  createField,
+  removeFieldById,
+  updateFieldById,
+} from '@/utils/schemaBuilder'
 
 const props = defineProps({
   visible: {
@@ -224,6 +272,8 @@ const form = reactive({
 const inputParams = ref([])
 const outputMappings = ref([])
 const outputSchemaFields = ref([])
+const outputFields = ref([])
+const outputSchemaMode = ref('mapping') // 'mapping' or 'visual'
 
 const resetForm = () => {
   Object.assign(form, {
@@ -235,6 +285,8 @@ const resetForm = () => {
   inputParams.value = []
   outputMappings.value = []
   outputSchemaFields.value = []
+  outputFields.value = []
+  outputSchemaMode.value = 'mapping'
 }
 
 const initForm = (tool) => {
@@ -264,16 +316,33 @@ watch(() => props.editingTool, (newVal) => {
   initForm(newVal)
 })
 
-const onServerChange = () => {
-  // Server 变化时可以做额外处理
+const onServerChange = async () => {
+  if (form.vauth_key) {
+    // 使用简化版接口获取服务列表
+    try {
+      const response = await servicesApi.getServicesSimple()
+      servicesStore.services = response.data
+    } catch (error) {
+      console.error('获取服务列表失败:', error)
+    }
+  }
 }
 
-const onServiceChange = () => {
-  // 服务变化时自动同步入参和出参
-  const service = services.value.find(s => s.id === form.service_id)
-  if (service) {
-    syncInputFromService(service)
-    syncOutputFromService(service)
+const onServiceChange = async () => {
+  if (form.service_id) {
+    // 拉取完整服务信息
+    try {
+      const response = await servicesApi.getService(form.service_id)
+      const service = response.data
+      
+      // 同步入参
+      syncInputFromService(service)
+      
+      // 同步出参字段
+      syncOutputFromService(service)
+    } catch (error) {
+      console.error('获取服务信息失败:', error)
+    }
   }
 }
 
@@ -297,12 +366,12 @@ const syncInputFromService = (service) => {
   }
 }
 
-const syncOutputFromService = () => {
-  const service = services.value.find(s => s.id === form.service_id)
+const syncOutputFromService = (service) => {
   if (!service) return
   const schema = service.output_schema
   if (schema && schema.properties) {
-    outputSchemaFields.value = Object.keys(schema.properties)
+    // 提取所有字段（包括嵌套）
+    outputSchemaFields.value = extractSchemaFields(schema)
   }
 }
 
@@ -330,14 +399,60 @@ const removeOutputMapping = (index) => {
   outputMappings.value.splice(index, 1)
 }
 
+// 切换出参编辑模式
+const switchToOutputSchemaMode = (mode) => {
+  if (mode === 'visual' && outputMappings.value.length > 0) {
+    // 从映射生成schema
+    generateOutputSchemaFromMappings()
+  }
+  outputSchemaMode.value = mode
+}
+
+// 从映射生成出参schema
+const generateOutputSchemaFromMappings = () => {
+  const schema = { type: 'object', properties: {} }
+  
+  outputMappings.value.forEach(mapping => {
+    if (mapping.source_field && mapping.target_field) {
+      const nestedObject = createNestedObject(mapping.target_field, {
+        type: 'string' // 默认类型，可后续编辑
+      })
+      mergeNestedObjects(schema.properties, nestedObject)
+    }
+  })
+  
+  outputFields.value = schemaToFields(schema)
+}
+
+// 处理出参字段更新
+const handleOutputFieldUpdate = (id, updates) => {
+  outputFields.value = updateFieldById(outputFields.value, id, updates)
+}
+
+// 处理出参字段删除
+const handleOutputFieldDelete = (id) => {
+  outputFields.value = removeFieldById(outputFields.value, id)
+}
+
+// 添加出参字段
+const addOutputField = () => {
+  outputFields.value = [...outputFields.value, createField()]
+}
+
 const handleSubmit = async () => {
+  let outputSchema = null
+  if (outputSchemaMode.value === 'visual' && outputFields.value.length > 0) {
+    outputSchema = fieldsToSchema(outputFields.value)
+  }
+
   const payload = {
     name: form.name,
     description: form.description,
     vauth_key: form.vauth_key,
     service_id: form.service_id,
     parameters: inputParams.value.filter(p => p.name),
-    output_mapping: outputMappings.value.filter(m => m.source_field && m.target_field)
+    output_mapping: outputMappings.value.filter(m => m.source_field && m.target_field),
+    output_schema: outputSchema
   }
 
   emit('saved', payload)
