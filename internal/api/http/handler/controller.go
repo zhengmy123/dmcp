@@ -34,6 +34,7 @@ func NewController(store repository.ServiceStore, manager *service.HTTPServiceMa
 // RegisterRoutes 注册路由到Gin引擎
 func (c *Controller) RegisterRoutes(router *gin.RouterGroup) {
 	router.GET("/services", c.listServices)
+	router.GET("/services/simple", c.GetServicesSimple)
 	router.GET("/services/:id", c.getService)
 	router.POST("/services", c.createService)
 	router.PUT("/services/:id", c.updateService)
@@ -55,6 +56,34 @@ func (c *Controller) listServices(ctx *gin.Context) {
 		"services": services,
 		"count":    len(services),
 	})
+}
+
+// GetServicesSimple 获取简化版服务列表（只返回id和name）
+func (c *Controller) GetServicesSimple(ctx *gin.Context) {
+	services, err := c.store.List(ctx.Request.Context())
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{
+			"error":   "failed to list services",
+			"details": err.Error(),
+		})
+		return
+	}
+	
+	// 构建简化版响应
+	type SimpleService struct {
+		ID   uint   `json:"id"`
+		Name string `json:"name"`
+	}
+	
+	var simpleServices []SimpleService
+	for _, service := range services {
+		simpleServices = append(simpleServices, SimpleService{
+			ID:   service.ID,
+			Name: service.Name,
+		})
+	}
+	
+	ctx.JSON(http.StatusOK, simpleServices)
 }
 
 func (c *Controller) getService(ctx *gin.Context) {
