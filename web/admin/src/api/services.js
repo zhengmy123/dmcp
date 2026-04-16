@@ -6,6 +6,11 @@ export const servicesApi = {
     return request.get('/api/v1/services')
   },
 
+  // 获取简化版服务列表（只返回id和name）
+  getServicesSimple() {
+    return request.get('/api/v1/services/simple')
+  },
+
   // 获取单个服务
   getService(id) {
     return request.get(`/api/v1/services/${id}`)
