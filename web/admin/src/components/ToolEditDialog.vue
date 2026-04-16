@@ -274,6 +274,7 @@ const outputMappings = ref([])
 const outputSchemaFields = ref([])
 const outputFields = ref([])
 const outputSchemaMode = ref('mapping') // 'mapping' or 'visual'
+const outputMappingMode = ref('full') // 'full' or 'custom'
 
 const resetForm = () => {
   Object.assign(form, {
@@ -287,6 +288,7 @@ const resetForm = () => {
   outputSchemaFields.value = []
   outputFields.value = []
   outputSchemaMode.value = 'mapping'
+  outputMappingMode.value = 'full'
 }
 
 const initForm = (tool) => {
@@ -299,6 +301,8 @@ const initForm = (tool) => {
     })
     inputParams.value = tool.parameters ? [...tool.parameters] : []
     outputMappings.value = tool.output_mapping ? [...tool.output_mapping] : []
+    // 默认为 full 模式，如果有自定义字段标记则为 custom
+    outputMappingMode.value = tool.output_mapping_mode || 'full'
   } else {
     resetForm()
   }
@@ -391,7 +395,9 @@ const removeInputParam = (index) => {
 const addOutputMapping = () => {
   outputMappings.value.push({
     source_field: '',
-    target_field: ''
+    target_field: '',
+    value_type: 'field',
+    default_value: ''
   })
 }
 
