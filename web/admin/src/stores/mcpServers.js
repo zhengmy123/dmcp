@@ -8,13 +8,30 @@ export const useMCPServersStore = defineStore('mcpServers', () => {
   const loading = ref(false)
   const error = ref(null)
 
+  const pagination = ref({
+    page: 1,
+    pageSize: 20,
+    total: 0
+  })
+
   // 获取所有 Server
   const fetchServers = async () => {
     loading.value = true
     error.value = null
     try {
-      const data = await mcpServerAPI.list()
-      servers.value = data.servers || []
+      const res = await mcpServerAPI.list()
+      const data = res.data || res
+      const items = data.servers || data.items || []
+      servers.value = items
+      if (data.total !== undefined) {
+        pagination.value.total = data.total
+      }
+      if (data.page !== undefined) {
+        pagination.value.page = data.page
+      }
+      if (data.page_size !== undefined) {
+        pagination.value.pageSize = data.page_size
+      }
     } catch (e) {
       error.value = e.message
       servers.value = []
@@ -28,7 +45,8 @@ export const useMCPServersStore = defineStore('mcpServers', () => {
     loading.value = true
     error.value = null
     try {
-      const data = await mcpServerAPI.get(id)
+      const res = await mcpServerAPI.get(id)
+      const data = res.data || res
       currentServer.value = data.server
       return data.server
     } catch (e) {

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
@@ -18,9 +19,10 @@ var (
 
 // MCPServerService 提供 MCPServer 的业务逻辑
 type MCPServerService struct {
-	serverStore  repository.MCPServerStore
-	bindingStore repository.TokenServerBindingStore
-	toolStore    repository.ToolStore
+	serverStore        repository.MCPServerStore
+	bindingStore       repository.TokenServerBindingStore
+	toolStore          repository.ToolStore
+	toolServerBindingStore repository.ToolServerBindingStore
 }
 
 // NewMCPServerService 创建 MCPServerService
@@ -28,11 +30,13 @@ func NewMCPServerService(
 	serverStore repository.MCPServerStore,
 	bindingStore repository.TokenServerBindingStore,
 	toolStore repository.ToolStore,
+	toolServerBindingStore repository.ToolServerBindingStore,
 ) *MCPServerService {
 	return &MCPServerService{
-		serverStore:  serverStore,
-		bindingStore: bindingStore,
-		toolStore:    toolStore,
+		serverStore:        serverStore,
+		bindingStore:       bindingStore,
+		toolStore:          toolStore,
+		toolServerBindingStore: toolServerBindingStore,
 	}
 }
 
@@ -113,22 +117,36 @@ func (s *MCPServerService) DeleteServer(ctx context.Context, id uint) error {
 
 // GetServerTools 获取 Server 下的所有工具
 func (s *MCPServerService) GetServerTools(ctx context.Context, serverID uint) ([]*model.ToolDefinition, error) {
-	// 验证服务器存在
-	server, err := s.serverStore.GetByID(ctx, serverID)
+	bindings, err := s.toolServerBindingStore.ListByServerID(ctx, serverID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrMCPServerNotFound
-		}
 		return nil, err
 	}
 
-	return s.toolStore.ListByVAuthKey(ctx, server.VAuthKey)
+	toolMap := make(map[uint]*model.ToolDefinition)
+	for _, binding := range bindings {
+		tool, err := s.toolStore.GetByID(ctx, binding.ToolID)
+		if err != nil {
+			continue
+		}
+		toolMap[tool.ID] = tool
+	}
+
+	tools := make([]*model.ToolDefinition, 0, len(bindings))
+	for _, binding := range bindings {
+		if tool, ok := toolMap[binding.ToolID]; ok {
+			tools = append(tools, tool)
+		}
+	}
+	return tools, nil
 }
 
 // AddToolToServer 向 Server 添加工具
 func (s *MCPServerService) AddToolToServer(ctx context.Context, serverID uint, tool *model.ToolDefinition) error {
-	// 验证服务器存在
-	server, err := s.serverStore.GetByID(ctx, serverID)
+	if err := model.ValidateToolName(tool.Name); err != nil {
+		return err
+	}
+
+	_, err := s.serverStore.GetByID(ctx, serverID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return ErrMCPServerNotFound
@@ -136,29 +154,47 @@ func (s *MCPServerService) AddToolToServer(ctx context.Context, serverID uint, t
 		return err
 	}
 
-	tool.VAuthKey = server.VAuthKey
 	tool.Enabled = true
 
-	return s.toolStore.AddToolWithVAuthKey(ctx, tool)
+	if err := s.toolStore.SaveTool(ctx, tool); err != nil {
+		return err
+	}
+
+	binding := &model.ToolServerBinding{
+		ToolID:   tool.ID,
+		ServerID: serverID,
+	}
+	return s.toolServerBindingStore.Save(ctx, binding)
 }
 
 // RemoveToolFromServer 从 Server 移除工具
 func (s *MCPServerService) RemoveToolFromServerByName(ctx context.Context, serverID uint, toolName string) error {
-	// 验证服务器存在
-	server, err := s.serverStore.GetByID(ctx, serverID)
+	tools, err := s.GetServerTools(ctx, serverID)
 	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrMCPServerNotFound
-		}
 		return err
 	}
 
-	return s.toolStore.RemoveToolByNameAndVAuthKey(ctx, toolName, server.VAuthKey)
+	var toolID uint
+	for _, tool := range tools {
+		if tool.Name == toolName {
+			toolID = tool.ID
+			break
+		}
+	}
+	if toolID == 0 {
+		return fmt.Errorf("tool not found: %s", toolName)
+	}
+
+	binding, err := s.toolServerBindingStore.GetByToolAndServer(ctx, toolID, serverID)
+	if err != nil {
+		return err
+	}
+
+	return s.toolServerBindingStore.Delete(ctx, binding.ID)
 }
 
 // AddToolsToServer 向 Server 添加工具
 func (s *MCPServerService) AddToolsToServer(ctx context.Context, serverID uint, toolNames []string) error {
-	// 验证服务器存在
 	_, err := s.serverStore.GetByID(ctx, serverID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -167,19 +203,32 @@ func (s *MCPServerService) AddToolsToServer(ctx context.Context, serverID uint, 
 		return err
 	}
 
-	return s.toolStore.AddToolsToServer(ctx, serverID, toolNames)
+	var toolIDs []uint
+	for _, name := range toolNames {
+		tools, err := s.toolStore.List(ctx)
+		if err != nil {
+			continue
+		}
+		for _, tool := range tools {
+			if tool.Name == name {
+				toolIDs = append(toolIDs, tool.ID)
+				break
+			}
+		}
+	}
+
+	bindings := make([]*model.ToolServerBinding, 0, len(toolIDs))
+	for _, toolID := range toolIDs {
+		bindings = append(bindings, &model.ToolServerBinding{
+			ToolID:   toolID,
+			ServerID: serverID,
+		})
+	}
+
+	return s.toolServerBindingStore.BatchSave(ctx, bindings)
 }
 
 // RemoveToolFromServer 从 Server 移除工具
 func (s *MCPServerService) RemoveToolFromServer(ctx context.Context, serverID uint, toolName string) error {
-	// 验证服务器存在
-	_, err := s.serverStore.GetByID(ctx, serverID)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrMCPServerNotFound
-		}
-		return err
-	}
-
-	return s.toolStore.RemoveToolFromServer(ctx, serverID, toolName)
+	return s.RemoveToolFromServerByName(ctx, serverID, toolName)
 }

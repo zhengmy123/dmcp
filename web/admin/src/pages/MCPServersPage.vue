@@ -92,7 +92,7 @@
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
               <div class="flex items-center justify-end space-x-1">
                 <button
-                  @click="openToolsModal(server)"
+                  @click="openBindingDialog(server)"
                   class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                   title="管理工具"
                 >
@@ -196,81 +196,26 @@
       </transition>
     </teleport>
 
-    <!-- Tools Management Modal -->
-    <teleport to="body">
-      <transition name="fade">
-        <div v-if="showToolsModal" class="fixed inset-0 z-50 overflow-y-auto">
-          <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showToolsModal = false"></div>
-            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-hidden fade-in">
-              <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                  <h3 class="text-lg font-semibold text-gray-900">管理工具</h3>
-                  <span class="px-2.5 py-1 text-xs font-medium bg-primary-100 text-primary-700 rounded-full">
-                    {{ selectedServer?.name }}
-                  </span>
-                </div>
-                <button @click="showToolsModal = false" class="text-gray-400 hover:text-gray-600">
-                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                  </svg>
-                </button>
-              </div>
-              <div class="p-6 overflow-y-auto max-h-[calc(90vh-130px)]">
-                <div v-if="allTools.length === 0" class="text-center py-8">
-                  <p class="text-gray-500">暂无可关联的工具</p>
-                  <p class="text-sm text-gray-400 mt-1">请先在"工具定义"中创建工具</p>
-                </div>
-                <div v-else class="space-y-4">
-                  <div class="flex items-center justify-between mb-3">
-                    <p class="text-sm text-gray-600">选择要关联到该 Server 的工具：</p>
-                    <button @click="saveTools" :disabled="savingTools"
-                      class="px-3 py-1.5 text-xs font-medium bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
-                      {{ savingTools ? '保存中...' : '保存更改' }}
-                    </button>
-                  </div>
-                  <div class="grid grid-cols-2 gap-3">
-                    <label
-                      v-for="tool in allTools"
-                      :key="tool.name"
-                      class="flex items-start p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
-                    >
-                      <input
-                        type="checkbox"
-                        :checked="selectedToolNames.includes(tool.name)"
-                        @change="toggleTool(tool.name)"
-                        class="rounded border-gray-300 text-primary-600 mt-0.5"
-                      >
-                      <div class="ml-2">
-                        <span class="text-sm font-medium text-gray-900">{{ tool.name }}</span>
-                        <p class="text-xs text-gray-500 line-clamp-1">{{ tool.description || '无描述' }}</p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </transition>
-    </teleport>
+    <!-- Server Binding Dialog -->
+    <ServerBindingDialog
+      :visible="showBindingDialog"
+      :selected-server="selectedServerForBinding"
+      @close="showBindingDialog = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useMCPServersStore } from '@/stores/mcpServers'
-import { useToolsStore } from '@/stores/tools'
+import ServerBindingDialog from '@/components/ServerBindingDialog.vue'
 
 const mcpServersStore = useMCPServersStore()
-const toolsStore = useToolsStore()
 
 const showModal = ref(false)
 const editingServer = ref(null)
-const showToolsModal = ref(false)
-const selectedServer = ref(null)
-const selectedToolNames = ref([])
-const savingTools = ref(false)
+const showBindingDialog = ref(false)
+const selectedServerForBinding = ref(null)
 
 const form = reactive({
   name: '',
@@ -280,7 +225,10 @@ const form = reactive({
   enabled: true
 })
 
-const allTools = computed(() => toolsStore.tools || [])
+const openBindingDialog = (server) => {
+  selectedServerForBinding.value = server
+  showBindingDialog.value = true
+}
 
 const refreshServers = () => {
   mcpServersStore.fetchServers()
@@ -329,43 +277,6 @@ const handleDelete = async (server) => {
     await mcpServersStore.deleteServer(server.id)
   } catch (e) {
     console.error('删除失败:', e)
-  }
-}
-
-const openToolsModal = async (server) => {
-  selectedServer.value = server
-  selectedToolNames.value = [...(server.tools || [])]
-  await toolsStore.fetchTools()
-  showToolsModal.value = true
-}
-
-const toggleTool = (toolName) => {
-  const index = selectedToolNames.value.indexOf(toolName)
-  if (index === -1) {
-    selectedToolNames.value.push(toolName)
-  } else {
-    selectedToolNames.value.splice(index, 1)
-  }
-}
-
-const saveTools = async () => {
-  savingTools.value = true
-  try {
-    const currentTools = selectedServer.value.tools || []
-    const toAdd = selectedToolNames.value.filter(t => !currentTools.includes(t))
-    const toRemove = currentTools.filter(t => !selectedToolNames.value.includes(t))
-
-    for (const toolName of toAdd) {
-      await mcpServersStore.addToolsToServer(selectedServer.value.id, [toolName])
-    }
-    for (const toolName of toRemove) {
-      await mcpServersStore.removeToolFromServer(selectedServer.value.id, toolName)
-    }
-    showToolsModal.value = false
-  } catch (e) {
-    console.error('保存工具失败:', e)
-  } finally {
-    savingTools.value = false
   }
 }
 

@@ -7,25 +7,20 @@ export const useToolsStore = defineStore('tools', () => {
   const loading = ref(false)
   const error = ref(null)
 
-  const groupedTools = computed(() => {
-    const groups = {}
-    tools.value.forEach(tool => {
-      const key = tool.vauth_key || 'default'
-      if (!groups[key]) {
-        groups[key] = []
-      }
-      groups[key].push(tool)
-    })
-    return groups
+  const pagination = ref({
+    page: 1,
+    pageSize: 20,
+    total: 0
   })
 
-  const serviceCount = computed(() => Object.keys(groupedTools.value).length)
+  const searchKeyword = ref('')
 
   const fetchTools = async () => {
     loading.value = true
     error.value = null
     try {
-      const data = await toolsApi.getTools()
+      const res = await toolsApi.getTools()
+      const data = res.data || res
       tools.value = data.tools || []
     } catch (e) {
       error.value = e.message
@@ -35,15 +30,28 @@ export const useToolsStore = defineStore('tools', () => {
     }
   }
 
-  // ========== 工具管理功能 ==========
-
-  // 获取工具列表（管理）
-  const fetchToolsForAdmin = async () => {
+  const fetchToolsForAdmin = async (params = {}) => {
     loading.value = true
     error.value = null
     try {
-      const data = await toolsApi.list()
-      tools.value = data.tools || []
+      const queryParams = {
+        page: params.page || pagination.value.page,
+        page_size: params.page_size || pagination.value.pageSize,
+        keyword: params.keyword !== undefined ? params.keyword : searchKeyword.value
+      }
+      const res = await toolsApi.list(queryParams)
+      const data = res.data || res
+      const items = data.tools || data.items || []
+      tools.value = items
+      if (data.total !== undefined) {
+        pagination.value.total = data.total
+      }
+      if (data.page !== undefined) {
+        pagination.value.page = data.page
+      }
+      if (data.page_size !== undefined) {
+        pagination.value.pageSize = data.page_size
+      }
     } catch (e) {
       error.value = e.message
       tools.value = []
@@ -52,7 +60,17 @@ export const useToolsStore = defineStore('tools', () => {
     }
   }
 
-  // 创建工具
+  const setPage = (page) => {
+    pagination.value.page = page
+    fetchToolsForAdmin({ page })
+  }
+
+  const setKeyword = (keyword) => {
+    searchKeyword.value = keyword
+    pagination.value.page = 1
+    fetchToolsForAdmin({ keyword, page: 1 })
+  }
+
   const createTool = async (data) => {
     loading.value = true
     error.value = null
@@ -68,7 +86,6 @@ export const useToolsStore = defineStore('tools', () => {
     }
   }
 
-  // 更新工具
   const updateTool = async (id, data) => {
     loading.value = true
     error.value = null
@@ -84,7 +101,6 @@ export const useToolsStore = defineStore('tools', () => {
     }
   }
 
-  // 删除工具
   const deleteTool = async (id) => {
     loading.value = true
     error.value = null
@@ -104,10 +120,12 @@ export const useToolsStore = defineStore('tools', () => {
     tools,
     loading,
     error,
-    groupedTools,
-    serviceCount,
+    pagination,
+    searchKeyword,
     fetchTools,
     fetchToolsForAdmin,
+    setPage,
+    setKeyword,
     createTool,
     updateTool,
     deleteTool

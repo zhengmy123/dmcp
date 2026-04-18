@@ -1,159 +1,161 @@
 package mcp
 
 import (
-	"encoding/json"
-	"net/http"
+	"fmt"
 	"strconv"
 
 	"dynamic_mcp_go_server/internal/common/logger"
+	"dynamic_mcp_go_server/internal/common/response"
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
 
+	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
-// ToolHandler 工具管理的 HTTP Handler
 type ToolHandler struct {
 	db           *gorm.DB
-	serviceStore  repository.ServiceStore
+	serviceStore repository.ServiceStore
 	logger       logger.Logger
 }
 
-// NewToolHandler 创建 ToolHandler
 func NewToolHandler(db *gorm.DB, serviceStore repository.ServiceStore, log logger.Logger) *ToolHandler {
 	return &ToolHandler{
-		db:          db,
+		db:           db,
 		serviceStore: serviceStore,
-		logger:      log,
+		logger:       log,
 	}
 }
 
-// ListTools GET /api/admin/tools - 列表
+type ToolListResponse struct {
+	Total    int64              `json:"total"`
+	Page     int                `json:"page"`
+	PageSize int                `json:"page_size"`
+	Tools    []ToolItemResponse `json:"tools"`
+}
+
+type ToolItemResponse struct {
+	ID            uint                         `json:"id"`
+	Name          string                       `json:"name"`
+	Description   string                       `json:"description"`
+	ServiceID     uint                         `json:"service_id"`
+	Parameters    []model.ParameterDefinition  `json:"parameters"`
+	InputMapping  []model.InputMappingField    `json:"input_mapping"`
+	OutputMapping []model.OutputMappingField   `json:"output_mapping"`
+	Enabled       bool                         `json:"enabled"`
+	CreatedAt     string                       `json:"created_at"`
+	UpdatedAt     string                       `json:"updated_at"`
+}
+
 func (h *ToolHandler) ListTools(ctx *gin.Context) {
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "20"))
+	keyword := ctx.Query("keyword")
+
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 20
+	}
+	offset := (page - 1) * pageSize
+
+	var total int64
 	var tools []model.ToolDefinition
-	result := h.db.WithContext(ctx.Request.Context()).
-		Where("enabled = ?", true).
-		Find(&tools)
-	if result.Error != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to list tools",
-			"details": result.Error.Error(),
-		})
+
+	query := h.db.WithContext(ctx.Request.Context()).Model(&model.ToolDefinition{})
+	if keyword != "" {
+		query = query.Where("name LIKE ?", "%"+keyword+"%")
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		response.InternalError(ctx, err.Error())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"tools": tools,
-		"count": len(tools),
+	if err := query.Offset(offset).Limit(pageSize).Order("id DESC").Find(&tools).Error; err != nil {
+		response.InternalError(ctx, err.Error())
+		return
+	}
+
+	items := make([]ToolItemResponse, 0, len(tools))
+	for _, t := range tools {
+		params := h.parseParameters(t.Parameters)
+		inputMapping := h.parseInputMapping(t.InputMapping)
+		outputMapping := h.parseOutputMapping(t.OutputMapping)
+		items = append(items, ToolItemResponse{
+			ID:            t.ID,
+			Name:          t.Name,
+			Description:   t.Description,
+			ServiceID:     t.ServiceID,
+			Parameters:    params,
+			InputMapping:  inputMapping,
+			OutputMapping: outputMapping,
+			Enabled:       t.Enabled,
+			CreatedAt:     t.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			UpdatedAt:     t.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		})
+	}
+
+	response.Success(ctx, gin.H{
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+		"tools":     items,
 	})
 }
 
-// GetTool GET /api/admin/tools/:id - 详情
+func (h *ToolHandler) parseParameters(data []byte) []model.ParameterDefinition {
+	if len(data) == 0 {
+		return nil
+	}
+	var params []model.ParameterDefinition
+	if err := sonic.Unmarshal(data, &params); err != nil {
+		return nil
+	}
+	return params
+}
+
+func (h *ToolHandler) parseInputMapping(data []byte) []model.InputMappingField {
+	if len(data) == 0 {
+		return nil
+	}
+	var mapping []model.InputMappingField
+	if err := sonic.Unmarshal(data, &mapping); err != nil {
+		return nil
+	}
+	return mapping
+}
+
+func (h *ToolHandler) parseOutputMapping(data []byte) []model.OutputMappingField {
+	if len(data) == 0 {
+		return nil
+	}
+	var mapping []model.OutputMappingField
+	if err := sonic.Unmarshal(data, &mapping); err != nil {
+		return nil
+	}
+	return mapping
+}
+
+func (h *ToolHandler) serializeParameters(data []byte) []byte {
+	if len(data) == 0 {
+		return nil
+	}
+	var params []model.ParameterDefinition
+	if err := sonic.Unmarshal(data, &params); err != nil {
+		return nil
+	}
+	result, _ := sonic.Marshal(params)
+	return result
+}
+
 func (h *ToolHandler) GetTool(ctx *gin.Context) {
 	idParam := ctx.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid tool id",
-			"id":   idParam,
-		})
-		return
-	}
-
-	var tool model.ToolDefinition
-	result := h.db.WithContext(ctx.Request.Context()).
-		Where("id = ? AND enabled = ?", id, true).
-		First(&tool)
-
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"error": "tool not found",
-				"id":   idParam,
-			})
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to get tool",
-			"details": result.Error.Error(),
-		})
-		return
-	}
-
-	ctx.JSON(http.StatusOK, gin.H{
-		"tool": tool,
-	})
-}
-
-// CreateToolRequest 创建工具请求
-type CreateToolRequest struct {
-	Name        string                  `json:"name" binding:"required"`
-	Description string                  `json:"description"`
-	Parameters  []model.ParameterDefinition `json:"parameters"`
-	VAuthKey    string                  `json:"vauth_key" binding:"required"`
-	ServerDesc  string                  `json:"server_desc"`
-	ServiceID   uint                    `json:"service_id"`
-	InputExtra  json.RawMessage         `json:"input_extra"`
-}
-
-// CreateTool POST /api/admin/tools - 创建
-func (h *ToolHandler) CreateTool(ctx *gin.Context) {
-	var req CreateToolRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid request body",
-			"details": err.Error(),
-		})
-		return
-	}
-
-	tool := model.ToolDefinition{
-		Name:        req.Name,
-		Description: req.Description,
-		Parameters:  req.Parameters,
-		Enabled:     true,
-		VAuthKey:    req.VAuthKey,
-		ServerDesc:  req.ServerDesc,
-		ServiceID:   req.ServiceID,
-		InputExtra:  req.InputExtra,
-	}
-
-	result := h.db.WithContext(ctx.Request.Context()).Create(&tool)
-	if result.Error != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to create tool",
-			"details": result.Error.Error(),
-		})
-		return
-	}
-
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "tool created successfully",
-		"tool":   tool,
-	})
-}
-
-// UpdateToolRequest 更新工具请求
-type UpdateToolRequest struct {
-	Name          string                  `json:"name"`
-	Description   string                  `json:"description"`
-	Parameters    []model.ParameterDefinition `json:"parameters"`
-	Enabled       *bool                   `json:"enabled"`
-	ServerDesc    string                  `json:"server_desc"`
-	InputExtra    json.RawMessage         `json:"input_extra"`
-	OutputMapping json.RawMessage         `json:"output_mapping"`
-}
-
-// UpdateTool PUT /api/admin/tools/:id - 更新
-func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
-	idParam := ctx.Param("id")
-	id, err := strconv.ParseUint(idParam, 10, 64)
-	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid tool id",
-			"id":   idParam,
-		})
+		response.BadRequest(ctx, "invalid tool id")
 		return
 	}
 
@@ -164,45 +166,149 @@ func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
 
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
-			ctx.JSON(http.StatusNotFound, gin.H{
-				"error": "tool not found",
-				"id":   idParam,
-			})
+			response.NotFound(ctx, "tool not found")
 			return
 		}
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to get tool",
-			"details": result.Error.Error(),
-		})
+		response.InternalError(ctx, result.Error.Error())
+		return
+	}
+
+	params := h.parseParameters(tool.Parameters)
+	inputMapping := h.parseInputMapping(tool.InputMapping)
+	outputMapping := h.parseOutputMapping(tool.OutputMapping)
+
+	response.Success(ctx, gin.H{
+		"tool": gin.H{
+			"id":             tool.ID,
+			"name":           tool.Name,
+			"description":    tool.Description,
+			"service_id":     tool.ServiceID,
+			"parameters":     params,
+			"input_mapping":  inputMapping,
+			"output_mapping": outputMapping,
+			"enabled":        tool.Enabled,
+			"created_at":     tool.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
+			"updated_at":     tool.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
+		},
+	})
+}
+
+type CreateToolRequest struct {
+	Name          string `json:"name" binding:"required"`
+	Description   string `json:"description"`
+	ServiceID     uint   `json:"service_id"`
+	Parameters    []byte `json:"parameters"`
+	InputMapping  []byte `json:"input_mapping"`
+	OutputMapping []byte `json:"output_mapping"`
+}
+
+func (h *ToolHandler) CreateTool(ctx *gin.Context) {
+	var req CreateToolRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(ctx, "invalid request body: "+err.Error())
+		return
+	}
+
+	if err := model.ValidateToolName(req.Name); err != nil {
+		response.BadRequest(ctx, "invalid tool name: "+err.Error())
+		return
+	}
+
+	var existing model.ToolDefinition
+	if err := h.db.WithContext(ctx.Request.Context()).
+		Where("name = ? AND enabled = ?", req.Name, true).
+		First(&existing).Error; err == nil {
+		response.Conflict(ctx, fmt.Sprintf("tool with name %q already exists", req.Name))
+		return
+	}
+
+	tool := model.ToolDefinition{
+		Name:          req.Name,
+		Description:   req.Description,
+		ServiceID:     req.ServiceID,
+		Parameters:    req.Parameters,
+		InputMapping:  req.InputMapping,
+		Enabled:       true,
+		OutputMapping: req.OutputMapping,
+	}
+
+	result := h.db.WithContext(ctx.Request.Context()).Create(&tool)
+	if result.Error != nil {
+		response.InternalError(ctx, result.Error.Error())
+		return
+	}
+
+	response.Created(ctx, gin.H{
+		"tool": tool,
+	})
+}
+
+type UpdateToolRequest struct {
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	ServiceID     *uint  `json:"service_id"`
+	Parameters    []byte `json:"parameters"`
+	InputMapping  []byte `json:"input_mapping"`
+	Enabled       *bool  `json:"enabled"`
+	OutputMapping []byte `json:"output_mapping"`
+}
+
+func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
+	idParam := ctx.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		response.BadRequest(ctx, "invalid tool id")
+		return
+	}
+
+	var tool model.ToolDefinition
+	result := h.db.WithContext(ctx.Request.Context()).
+		Where("id = ?", id).
+		First(&tool)
+
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			response.NotFound(ctx, "tool not found")
+			return
+		}
+		response.InternalError(ctx, result.Error.Error())
 		return
 	}
 
 	var req UpdateToolRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error":   "invalid request body",
-			"details": err.Error(),
-		})
+		response.BadRequest(ctx, "invalid request body: "+err.Error())
 		return
 	}
 
 	if req.Name != "" {
+		if err := model.ValidateToolName(req.Name); err != nil {
+			response.BadRequest(ctx, "invalid tool name: "+err.Error())
+			return
+		}
+		var existing model.ToolDefinition
+		if err := h.db.WithContext(ctx.Request.Context()).
+			Where("name = ? AND enabled = ? AND id != ?", req.Name, true, id).
+			First(&existing).Error; err == nil {
+			response.Conflict(ctx, fmt.Sprintf("tool with name %q already exists", req.Name))
+			return
+		}
 		tool.Name = req.Name
 	}
 	if req.Description != "" {
 		tool.Description = req.Description
 	}
+	if req.ServiceID != nil {
+		tool.ServiceID = *req.ServiceID
+	}
 	if req.Parameters != nil {
 		tool.Parameters = req.Parameters
 	}
+	if req.InputMapping != nil {
+		tool.InputMapping = req.InputMapping
+	}
 	if req.Enabled != nil {
 		tool.Enabled = *req.Enabled
-	}
-	if req.ServerDesc != "" {
-		tool.ServerDesc = req.ServerDesc
-	}
-	if req.InputExtra != nil {
-		tool.InputExtra = req.InputExtra
 	}
 	if req.OutputMapping != nil {
 		tool.OutputMapping = req.OutputMapping
@@ -210,79 +316,53 @@ func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
 
 	result = h.db.WithContext(ctx.Request.Context()).Save(&tool)
 	if result.Error != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to update tool",
-			"details": result.Error.Error(),
-		})
+		response.InternalError(ctx, result.Error.Error())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "tool updated successfully",
-	})
+	response.Success(ctx, nil)
 }
 
-// DeleteTool DELETE /api/admin/tools/:id - 删除
 func (h *ToolHandler) DeleteTool(ctx *gin.Context) {
 	idParam := ctx.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid tool id",
-			"id":   idParam,
-		})
+		response.BadRequest(ctx, "invalid tool id")
 		return
 	}
 
-	// 软删除
 	result := h.db.WithContext(ctx.Request.Context()).
 		Model(&model.ToolDefinition{}).
 		Where("id = ?", id).
 		Update("enabled", false)
 
 	if result.Error != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "failed to delete tool",
-			"details": result.Error.Error(),
-		})
+		response.InternalError(ctx, result.Error.Error())
 		return
 	}
 	if result.RowsAffected == 0 {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"error": "tool not found",
-			"id":   idParam,
-		})
+		response.NotFound(ctx, "tool not found")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
-		"message": "tool deleted successfully",
-	})
+	response.Success(ctx, nil)
 }
 
-// GetHTTPServiceOutputSchema GET /api/admin/http-services/:id/output-schema - 获取指定服务的 OutputSchema
 func (h *ToolHandler) GetHTTPServiceOutputSchema(ctx *gin.Context) {
 	idParam := ctx.Param("id")
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid service id",
-			"id":   idParam,
-		})
+		response.BadRequest(ctx, "invalid service id")
 		return
 	}
 
 	service, err := h.serviceStore.Get(ctx.Request.Context(), uint(id))
 	if err != nil {
-		ctx.JSON(http.StatusNotFound, gin.H{
-			"error":   "service not found",
-			"details": err.Error(),
-			"id":      idParam,
-		})
+		response.NotFound(ctx, "service not found")
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{
+	response.Success(ctx, gin.H{
 		"service_id":    service.ID,
 		"name":          service.Name,
 		"output_schema": service.OutputSchema,

@@ -2,7 +2,7 @@ package database
 
 import (
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 
 	"dynamic_mcp_go_server/internal/common/logger"
@@ -61,7 +61,7 @@ func (d *GORMServiceDAO) Get(ctx context.Context, id uint) (*model.HTTPService, 
 // Save 保存服务（创建或更新）
 func (d *GORMServiceDAO) Save(ctx context.Context, service *model.HTTPService) error {
 	if service.Headers != nil {
-		headersJSON, err := json.Marshal(service.Headers)
+		headersJSON, err := sonic.Marshal(service.Headers)
 		if err != nil {
 			return fmt.Errorf("marshal headers failed: %w", err)
 		}
@@ -100,7 +100,7 @@ func (d *GORMServiceDAO) Delete(ctx context.Context, id uint) error {
 // unmarshalJSONFields 反序列化服务对象中的JSON字段
 func (d *GORMServiceDAO) unmarshalJSONFields(s *model.HTTPService) {
 	if s.HeadersJSON != "" {
-		if err := json.Unmarshal([]byte(s.HeadersJSON), &s.Headers); err != nil {
+		if err := sonic.Unmarshal([]byte(s.HeadersJSON), &s.Headers); err != nil {
 			d.logger.Warn("unmarshal headers failed", logger.Error(err))
 		}
 	}

@@ -92,7 +92,7 @@ func (d *GORMUserDAO) Update(ctx context.Context, user *model.User) error {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("user not found: %s", user.ID)
+		return fmt.Errorf("user not found: %d", user.ID)
 	}
 	return nil
 }

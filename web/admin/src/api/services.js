@@ -7,12 +7,8 @@ export const servicesApi = {
   },
 
   // 获取简化版服务列表（只返回id和name）
-  getServicesSimple(vauthKey) {
-    return request.get('/api/v1/services/simple', {
-      headers: {
-        'X-VAuth-Key': vauthKey
-      }
-    })
+  getServicesSimple() {
+    return request.get('/api/v1/services/simple')
   },
 
   // 获取单个服务

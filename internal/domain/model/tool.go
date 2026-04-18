@@ -1,10 +1,13 @@
 package model
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
+
+	"github.com/bytedance/sonic"
 )
 
 // ParameterType 参数类型
@@ -30,21 +33,18 @@ type ParameterDefinition struct {
 }
 
 // ToolDefinition 动态工具定义
-// VAuthKey: 将多个不同的 HTTP 接口打包成一个 MCP Server 的聚合键
-// ServerDesc: MCP Server 的描述信息
+// VAuthKey: 运行时通过 tool_mcp_server_bindings + mcp_servers 关联获取，不存储在DB
 type ToolDefinition struct {
-	ID            uint                  `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name          string                `json:"name" gorm:"size:128"`
-	Description   string                `json:"description" gorm:"type:text"`
-	Parameters    []ParameterDefinition `json:"parameters" gorm:"-"`
-	Enabled       bool                  `json:"enabled" gorm:"default:true"`
-	VAuthKey      string                `json:"vauth_key" gorm:"size:128;index"`
-	ServerDesc    string                `json:"server_desc" gorm:"size:512"`
-	ServiceID     uint                  `json:"service_id" gorm:"not null;default:0"`
-	InputExtra    json.RawMessage       `json:"input_extra" gorm:"type:text"`
-	OutputMapping json.RawMessage       `json:"output_mapping" gorm:"type:text"`
-	CreatedAt     time.Time             `json:"created_at" gorm:"autoCreateTime"`
-	UpdatedAt     time.Time             `json:"updated_at" gorm:"autoUpdateTime"`
+	ID            uint      `json:"id" gorm:"primaryKey;autoIncrement"`
+	Name          string    `json:"name" gorm:"size:128;uniqueIndex"`
+	Description   string    `json:"description" gorm:"type:text"`
+	ServiceID     uint      `json:"service_id" gorm:"index"`
+	Parameters    []byte    `json:"parameters" gorm:"type:text"`
+	InputMapping  []byte    `json:"input_mapping" gorm:"type:text"`
+	Enabled       bool      `json:"enabled" gorm:"default:true"`
+	OutputMapping []byte    `json:"output_mapping" gorm:"type:text"`
+	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }
 
 // InputExtraFields 入参扩展字段定义
@@ -62,8 +62,15 @@ type InputExtraConfig struct {
 
 // OutputMappingField 出参映射字段
 type OutputMappingField struct {
-	Source      string `json:"source"`       // 源字段（来自HTTP服务OutputSchema）
-	Target      string `json:"target"`       // 目标字段名（MCP工具返回）
+	Source      string `json:"source"` // 源字段（来自HTTP服务OutputSchema）
+	Target      string `json:"target"` // 目标字段名（MCP工具返回）
+	Description string `json:"description,omitempty"`
+}
+
+// InputMappingField 入参映射字段
+type InputMappingField struct {
+	Source      string `json:"source"` // 源字段（来自MCP工具入参）
+	Target      string `json:"target"` // 目标字段名（HTTP服务InputSchema）
 	Description string `json:"description,omitempty"`
 }
 
@@ -82,14 +89,12 @@ type toolDefinitionJSON struct {
 	Description string                `json:"description"`
 	Parameters  []ParameterDefinition `json:"parameters"`
 	Enabled     *bool                 `json:"enabled"`
-	VAuthKey    string                `json:"vauth_key"`
-	ServerDesc  string                `json:"server_desc,omitempty"`
 }
 
 // ParseToolDefinitions 解析工具定义数组
 func ParseToolDefinitions(raw []byte) ([]ToolDefinition, error) {
 	var inputs []toolDefinitionJSON
-	if err := json.Unmarshal(raw, &inputs); err != nil {
+	if err := sonic.Unmarshal(raw, &inputs); err != nil {
 		return nil, err
 	}
 	defs := make([]ToolDefinition, 0, len(inputs))
@@ -106,17 +111,40 @@ func ParseToolDefinitions(raw []byte) ([]ToolDefinition, error) {
 		if !*in.Enabled {
 			return nil, fmt.Errorf("tool %s: enabled must be true (got false); omit the tool from the JSON array to remove it", ref)
 		}
-		if strings.TrimSpace(in.VAuthKey) == "" {
-			return nil, fmt.Errorf("tool %s: missing required field vauth_key", ref)
+		paramsJSON, err := sonic.Marshal(in.Parameters)
+		if err != nil {
+			return nil, fmt.Errorf("tool %s: marshal parameters: %w", ref, err)
 		}
 		defs = append(defs, ToolDefinition{
 			Name:        name,
 			Description: in.Description,
-			Parameters:  in.Parameters,
+			Parameters:  paramsJSON,
 			Enabled:     true,
-			VAuthKey:    strings.TrimSpace(in.VAuthKey),
-			ServerDesc:  in.ServerDesc,
 		})
 	}
 	return defs, nil
+}
+
+const (
+	ToolNameMinLength = 1
+	ToolNameMaxLength = 64
+	ToolNamePattern   = `^[a-zA-Z0-9_.-]+$`
+)
+
+var toolNameRegex = regexp.MustCompile(ToolNamePattern)
+
+func ValidateToolName(name string) error {
+	if name == "" {
+		return errors.New("tool name cannot be empty")
+	}
+	if len(name) > ToolNameMaxLength {
+		return errors.New("tool name cannot exceed 64 characters")
+	}
+	if len(name) < ToolNameMinLength {
+		return errors.New("tool name must be at least 1 character")
+	}
+	if !toolNameRegex.MatchString(name) {
+		return errors.New("tool name can only contain letters, numbers, underscore (_), hyphen (-), and dot (.)")
+	}
+	return nil
 }

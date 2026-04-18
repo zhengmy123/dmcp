@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 
 	"dynamic_mcp_go_server/internal/common/logger"
 	"dynamic_mcp_go_server/internal/domain/model"
+
+	"github.com/bytedance/sonic"
 )
 
 // RequestData 是 model.RequestData 的别名
@@ -271,7 +272,7 @@ func (m *HTTPServiceManager) executeWithService(ctx context.Context, service *mo
 	// 解析响应体
 	var bodyObj interface{}
 	if len(bodyBytes) > 0 {
-		if err := json.Unmarshal(bodyBytes, &bodyObj); err != nil {
+		if err := sonic.Unmarshal(bodyBytes, &bodyObj); err != nil {
 			// 如果不是JSON，保持为字符串
 			bodyObj = string(bodyBytes)
 		}
@@ -394,7 +395,7 @@ func (m *HTTPServiceManager) buildRequest(ctx context.Context, service *model.HT
 }
 
 // fillDefaultsFromSchema 根据 JSON Schema 的 default 字段，为 body 中缺失的属性填充默认值
-func fillDefaultsFromSchema(schema json.RawMessage, body interface{}) interface{} {
+func fillDefaultsFromSchema(schema []byte, body interface{}) interface{} {
 	if len(schema) == 0 {
 		return body
 	}
@@ -404,7 +405,7 @@ func fillDefaultsFromSchema(schema json.RawMessage, body interface{}) interface{
 		Type       string                 `json:"type"`
 		Properties map[string]interface{} `json:"properties"`
 	}
-	if err := json.Unmarshal(schema, &schemaObj); err != nil {
+	if err := sonic.Unmarshal(schema, &schemaObj); err != nil {
 		return body
 	}
 	if schemaObj.Type != "object" || len(schemaObj.Properties) == 0 {
@@ -555,26 +556,26 @@ func (m *ServiceManagerWithDAO) DeleteFromDB(ctx context.Context, serviceID uint
 }
 
 // validateJSONSchema 使用JSON Schema校验数据
-func (m *HTTPServiceManager) validateJSONSchema(schema json.RawMessage, data interface{}, direction string) error {
+func (m *HTTPServiceManager) validateJSONSchema(schema []byte, data interface{}, direction string) error {
 	if len(schema) == 0 {
 		return nil
 	}
 
 	// 将data序列化为JSON再与schema进行基本校验
-	dataBytes, err := json.Marshal(data)
+	dataBytes, err := sonic.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("%s data marshal failed: %w", direction, err)
 	}
 
 	// 基本校验：确保schema本身是合法的JSON
 	var schemaObj interface{}
-	if err := json.Unmarshal(schema, &schemaObj); err != nil {
+	if err := sonic.Unmarshal(schema, &schemaObj); err != nil {
 		return fmt.Errorf("%s schema is invalid JSON: %w", direction, err)
 	}
 
 	// 基本校验：确保数据可以被解析
 	var dataObj interface{}
-	if err := json.Unmarshal(dataBytes, &dataObj); err != nil {
+	if err := sonic.Unmarshal(dataBytes, &dataObj); err != nil {
 		return fmt.Errorf("%s data is invalid JSON: %w", direction, err)
 	}
 

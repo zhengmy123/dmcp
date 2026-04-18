@@ -9,6 +9,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/bytedance/sonic"
 )
 
 // HTTPService 定义HTTP服务配置
@@ -27,11 +29,36 @@ type HTTPService struct {
 	ValidationEnabled       bool              `json:"validation_enabled" gorm:"default:false"`
 	RequestTransformScript  string            `json:"request_transform_script,omitempty" gorm:"type:text"`              // 请求转换脚本
 	ResponseTransformScript string            `json:"response_transform_script,omitempty" gorm:"type:text"`             // 响应转换脚本
-	InputSchema             json.RawMessage   `json:"input_schema,omitempty" gorm:"type:text"`                          // 入参JSON Schema
-	OutputSchema            json.RawMessage   `json:"output_schema,omitempty" gorm:"type:text"`                         // 出参JSON Schema
+	InputSchema             JSONBytes         `json:"input_schema,omitempty" gorm:"type:text"`                          // 入参JSON Schema
+	OutputSchema            JSONBytes         `json:"output_schema,omitempty" gorm:"type:text"`                         // 出参JSON Schema
 	Enabled                 bool              `json:"enabled" gorm:"default:true;index"`
 	CreatedAt               time.Time         `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt               time.Time         `json:"updated_at" gorm:"autoUpdateTime"`
+}
+
+// JSONBytes 自定义类型，用于将 []byte 直接序列化为 JSON 对象而不是 base64
+type JSONBytes []byte
+
+func (j JSONBytes) MarshalJSON() ([]byte, error) {
+	if len(j) == 0 {
+		return []byte("null"), nil
+	}
+	if !json.Valid(j) {
+		return []byte("null"), nil
+	}
+	return j, nil
+}
+
+func (j *JSONBytes) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" || string(data) == `""` || string(data) == "" {
+		*j = nil
+		return nil
+	}
+	if !json.Valid(data) {
+		return fmt.Errorf("invalid JSON: %s", string(data))
+	}
+	*j = data
+	return nil
 }
 
 func (HTTPService) TableName() string {
@@ -141,7 +168,7 @@ func encodeFormData(body interface{}) (*EncodeBodyResult, error) {
 	formData, ok := body.(map[string]interface{})
 	if !ok {
 		// 降级为 JSON
-		bodyBytes, _ := json.Marshal(body)
+		bodyBytes, _ := sonic.Marshal(body)
 		return &EncodeBodyResult{Reader: strings.NewReader(string(bodyBytes))}, nil
 	}
 
@@ -164,7 +191,7 @@ func encodeFormData(body interface{}) (*EncodeBodyResult, error) {
 func encodeURLEncoded(body interface{}) (*EncodeBodyResult, error) {
 	formData, ok := body.(map[string]interface{})
 	if !ok {
-		bodyBytes, _ := json.Marshal(body)
+		bodyBytes, _ := sonic.Marshal(body)
 		return &EncodeBodyResult{Reader: strings.NewReader(string(bodyBytes))}, nil
 	}
 
@@ -180,13 +207,13 @@ func encodeRawBody(body interface{}) *EncodeBodyResult {
 	if str, ok := body.(string); ok {
 		return &EncodeBodyResult{Reader: strings.NewReader(str)}
 	}
-	bodyBytes, _ := json.Marshal(body)
+	bodyBytes, _ := sonic.Marshal(body)
 	return &EncodeBodyResult{Reader: strings.NewReader(string(bodyBytes))}
 }
 
 // encodeJSONBody 将 body 编码为 JSON
 func encodeJSONBody(body interface{}) (*EncodeBodyResult, error) {
-	bodyBytes, err := json.Marshal(body)
+	bodyBytes, err := sonic.Marshal(body)
 	if err != nil {
 		return nil, fmt.Errorf("marshal request body failed: %w", err)
 	}
@@ -204,8 +231,8 @@ func NewHTTPService(name, targetURL, method string) *HTTPService {
 		Headers:        make(map[string]string),
 		TimeoutSeconds: DefaultTimeoutSeconds,
 		RetryCount:     DefaultRetryCount,
-		InputSchema:    json.RawMessage(`{"type":"object","properties":{}}`),
-		OutputSchema:   json.RawMessage(`{"type":"object","properties":{}}`),
+		InputSchema:    []byte(`{"type":"object","properties":{}}`),
+		OutputSchema:   []byte(`{"type":"object","properties":{}}`),
 		Enabled:        true,
 		CreatedAt:      now,
 		UpdatedAt:      now,

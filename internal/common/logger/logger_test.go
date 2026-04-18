@@ -3,7 +3,7 @@ package logger
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"testing"
 
 	"go.uber.org/zap"
@@ -47,7 +47,7 @@ func TestCtx_NoTraceID(t *testing.T) {
 	subLog.Info("test")
 
 	var entry map[string]interface{}
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+	if err := sonic.Unmarshal(buf.Bytes(), &entry); err != nil {
 		t.Fatal(err)
 	}
 	if _, exists := entry["trace_id"]; exists {
@@ -64,7 +64,7 @@ func TestCtx_WithTraceID(t *testing.T) {
 	subLog.Info("test message")
 
 	var entry map[string]interface{}
-	if err := json.Unmarshal(buf.Bytes(), &entry); err != nil {
+	if err := sonic.Unmarshal(buf.Bytes(), &entry); err != nil {
 		t.Fatal(err)
 	}
 	if id, ok := entry["trace_id"].(string); !ok || id != "abc-123-def" {
@@ -89,7 +89,7 @@ func TestCtx_WithTraceID_MultipleLogs(t *testing.T) {
 	}
 	for i, line := range lines {
 		var entry map[string]interface{}
-		if err := json.Unmarshal(line, &entry); err != nil {
+		if err := sonic.Unmarshal(line, &entry); err != nil {
 			t.Fatal(err)
 		}
 		if id, ok := entry["trace_id"].(string); !ok || id != "multi-trace-id" {

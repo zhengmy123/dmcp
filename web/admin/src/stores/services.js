@@ -7,12 +7,29 @@ export const useServicesStore = defineStore('services', () => {
   const loading = ref(false)
   const error = ref(null)
 
+  const pagination = ref({
+    page: 1,
+    pageSize: 20,
+    total: 0
+  })
+
   const fetchServices = async () => {
     loading.value = true
     error.value = null
     try {
-      const data = await servicesApi.getServices()
-      services.value = data.services || []
+      const res = await servicesApi.getServices()
+      const data = res.data || res
+      const items = data.services || data.items || []
+      services.value = items
+      if (data.total !== undefined) {
+        pagination.value.total = data.total
+      }
+      if (data.page !== undefined) {
+        pagination.value.page = data.page
+      }
+      if (data.page_size !== undefined) {
+        pagination.value.pageSize = data.page_size
+      }
     } catch (e) {
       error.value = e.message
       services.value = []

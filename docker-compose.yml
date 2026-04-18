@@ -59,16 +59,6 @@ services:
   #   networks:
   #     - mcp-network
 
-  web-build:
-    image: node:20-alpine
-    container_name: mcp-web-build
-    working_dir: /app
-    volumes:
-      - ./web/admin:/app
-    command: sh -c "npm install && npm run build"
-    networks:
-      - mcp-network
-
   web:
     image: nginx:alpine
     container_name: mcp-web
@@ -78,9 +68,6 @@ services:
     volumes:
       - ./web/admin/dist:/usr/share/nginx/html:ro
       - ./web/admin/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-    depends_on:
-      web-build:
-        condition: service_completed_successfully
     networks:
       - mcp-network
 

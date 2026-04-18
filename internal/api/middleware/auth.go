@@ -1,9 +1,9 @@
 package middleware
 
 import (
-	"net/http"
 	"strings"
 
+	"dynamic_mcp_go_server/internal/common/response"
 	"dynamic_mcp_go_server/internal/infrastructure/auth"
 
 	"github.com/gin-gonic/gin"
@@ -21,13 +21,15 @@ func JWTAuth(jwtManager *auth.JWTManager) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
+			response.Unauthorized(c, "missing authorization header")
+			c.Abort()
 			return
 		}
 
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
+			response.Unauthorized(c, "invalid authorization header format")
+			c.Abort()
 			return
 		}
 
@@ -36,10 +38,11 @@ func JWTAuth(jwtManager *auth.JWTManager) gin.HandlerFunc {
 		claims, err := jwtManager.ValidateToken(tokenString)
 		if err != nil {
 			if err == auth.ErrExpiredToken {
-				c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "token expired"})
-				return
+				response.Unauthorized(c, "token expired")
+			} else {
+				response.Unauthorized(c, "invalid token")
 			}
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
+			c.Abort()
 			return
 		}
 
@@ -56,7 +59,8 @@ func AdminRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, exists := c.Get(ContextUserRole)
 		if !exists || role != "admin" {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+			response.Forbidden(c, "admin access required")
+			c.Abort()
 			return
 		}
 		c.Next()

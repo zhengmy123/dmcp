@@ -14,8 +14,8 @@ export const toolsApi = {
   // ========== 工具管理端点 ==========
 
   // 获取工具列表（管理）
-  list() {
-    return request.get('/api/admin/tools')
+  list(params = {}) {
+    return request.get('/api/admin/tools', { params })
   },
 
   // 获取单个工具

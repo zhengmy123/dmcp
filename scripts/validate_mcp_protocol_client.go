@@ -209,7 +209,7 @@ func loadExpectedFlowMapping(path string) (map[string]string, error) {
 	}
 	out := make(map[string]string)
 	for _, def := range defs {
-		out[def.Name] = def.VAuthKey
+		out[def.Name] = ""
 	}
 	return out, nil
 }

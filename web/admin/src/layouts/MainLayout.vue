@@ -135,7 +135,7 @@
 </template>
 
 <script setup>
-import { ref, computed, provide, h } from 'vue'
+import { ref, computed, provide, h, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTokenStore } from '@/stores/tokens'
 import { useToolsStore } from '@/stores/tools'
@@ -149,6 +149,19 @@ const authStore = useAuthStore()
 
 const isRefreshing = ref(false)
 const toast = ref({ show: false, message: '', type: 'info' })
+
+onMounted(() => {
+  window.addEventListener('show-toast', (event) => {
+    const { message, type } = event.detail || {}
+    if (message) {
+      showToast(message, type || 'error')
+    }
+  })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('show-toast', () => {})
+})
 
 // 用户信息
 const userName = computed(() => authStore.userInfo?.name || authStore.userInfo?.username || '用户')

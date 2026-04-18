@@ -103,13 +103,13 @@ const handleLogin = async () => {
   try {
     const response = await authApi.login(form.value.username, form.value.password)
     
-    // 保存登录信息
-    authStore.login(response.token, response.user)
+    // 保存登录信息 - 注意 response 是统一格式 {code:0, data:{...}}
+    authStore.login(response.data.token, response.data.user)
     
     // 跳转到首页
     router.push('/dashboard')
   } catch (e) {
-    error.value = e.response?.data?.error || '登录失败，请检查用户名和密码'
+    error.value = e.message || e.response?.data?.message || e.response?.data?.error || '登录失败，请检查用户名和密码'
   } finally {
     loading.value = false
   }

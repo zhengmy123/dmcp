@@ -2,25 +2,24 @@ package database
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 
 	"dynamic_mcp_go_server/internal/domain/model"
 
+	"github.com/bytedance/sonic"
 	"gorm.io/gorm"
 )
 
 // ToolDAO 工具定义数据访问接口
 type ToolDAO interface {
 	List(ctx context.Context) ([]model.ToolDefinition, error)
-	GetByVAuthKey(ctx context.Context, vauthKey string) ([]model.ToolDefinition, error)
+	ListByServerID(ctx context.Context, serverID uint) ([]model.ToolDefinition, error)
 }
 
 // toolRow 工具定义行
 type toolRow struct {
 	ID          uint   `gorm:"column:id"`
-	VAuthKey    string `gorm:"column:vauth_key"`
 	Name        string `gorm:"column:name"`
 	Description string `gorm:"column:description"`
 	Parameters  []byte `gorm:"column:parameters"`
@@ -44,7 +43,7 @@ func NewGORMToolDAO(db *gorm.DB, table string) *GORMToolDAO {
 func (d *GORMToolDAO) List(ctx context.Context) ([]model.ToolDefinition, error) {
 	var rows []toolRow
 	result := d.db.WithContext(ctx).Table(d.table).
-		Select("vauth_key, name, description, parameters").
+		Select("name, description, parameters").
 		Where("enabled = ?", true).
 		Order("updated_at DESC").
 		Find(&rows)
@@ -55,12 +54,12 @@ func (d *GORMToolDAO) List(ctx context.Context) ([]model.ToolDefinition, error) 
 	return scanToolRows(rows)
 }
 
-// GetByVAuthKey 根据vauthKey获取工具定义
-func (d *GORMToolDAO) GetByVAuthKey(ctx context.Context, vauthKey string) ([]model.ToolDefinition, error) {
+// ListByServerID 根据服务器ID获取工具定义
+func (d *GORMToolDAO) ListByServerID(ctx context.Context, serverID uint) ([]model.ToolDefinition, error) {
 	var rows []toolRow
 	result := d.db.WithContext(ctx).Table(d.table).
-		Select("vauth_key, name, description, parameters").
-		Where("vauth_key = ? AND enabled = ?", vauthKey, true).
+		Select("name, description, parameters").
+		Where("service_id = ? AND enabled = ?", serverID, true).
 		Order("updated_at DESC").
 		Find(&rows)
 	if result.Error != nil {
@@ -74,17 +73,11 @@ func (d *GORMToolDAO) GetByVAuthKey(ctx context.Context, vauthKey string) ([]mod
 func scanToolRows(rows []toolRow) ([]model.ToolDefinition, error) {
 	defs := make([]model.ToolDefinition, 0, len(rows))
 	for _, r := range rows {
-		params, err := parseParametersJSON(r.Parameters)
-		if err != nil {
-			return nil, fmt.Errorf("parse parameters for tool %q: %w", r.Name, err)
-		}
-
 		defs = append(defs, model.ToolDefinition{
 			Name:        r.Name,
 			Description: r.Description,
-			Parameters:  params,
+			Parameters:  r.Parameters,
 			Enabled:     true,
-			VAuthKey:    r.VAuthKey,
 		})
 	}
 	return defs, nil
@@ -98,7 +91,7 @@ func parseParametersJSON(data []byte) ([]model.ParameterDefinition, error) {
 	}
 
 	var schema jsonSchemaObject
-	if err := json.Unmarshal(data, &schema); err != nil {
+	if err := sonic.Unmarshal(data, &schema); err != nil {
 		return nil, fmt.Errorf("invalid JSON Schema: %w", err)
 	}
 

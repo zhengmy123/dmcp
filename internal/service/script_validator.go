@@ -1,7 +1,7 @@
 package service
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"fmt"
 	"strings"
 	"time"
@@ -67,7 +67,7 @@ func (v *ScriptValidator) setupCommonVM(vm *goja.Runtime, headers map[string]str
 			if len(args) < 1 {
 				return "", fmt.Errorf("JSON.stringify requires at least 1 argument")
 			}
-			data, err := json.Marshal(args[0])
+			data, err := sonic.Marshal(args[0])
 			if err != nil {
 				return "", err
 			}
@@ -75,7 +75,7 @@ func (v *ScriptValidator) setupCommonVM(vm *goja.Runtime, headers map[string]str
 		},
 		"parse": func(str string) (interface{}, error) {
 			var result interface{}
-			err := json.Unmarshal([]byte(str), &result)
+			err := sonic.Unmarshal([]byte(str), &result)
 			return result, err
 		},
 	})

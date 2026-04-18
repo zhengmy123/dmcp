@@ -33,7 +33,6 @@ func (m *GORMToolStore) List(ctx context.Context) ([]model.ToolDefinition, error
 	}
 
 	type toolRow struct {
-		VAuthKey    string `gorm:"column:vauth_key"`
 		Name        string `gorm:"column:name"`
 		Description string `gorm:"column:description"`
 		Parameters  []byte `gorm:"column:parameters"`
@@ -41,7 +40,7 @@ func (m *GORMToolStore) List(ctx context.Context) ([]model.ToolDefinition, error
 
 	var rows []toolRow
 	result := m.db.WithContext(ctx).Table(m.table).
-		Select("vauth_key, name, description, parameters").
+		Select("name, description, parameters").
 		Where("enabled = ?", true).
 		Order("updated_at DESC").
 		Find(&rows)
@@ -54,9 +53,8 @@ func (m *GORMToolStore) List(ctx context.Context) ([]model.ToolDefinition, error
 		defs = append(defs, model.ToolDefinition{
 			Name:        r.Name,
 			Description: r.Description,
-			Parameters:  nil, // 需要时再解析
+			Parameters:  nil,
 			Enabled:     true,
-			VAuthKey:    r.VAuthKey,
 		})
 	}
 	return defs, nil

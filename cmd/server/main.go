@@ -18,6 +18,7 @@ import (
 	"dynamic_mcp_go_server/internal/config"
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
+	domainService "dynamic_mcp_go_server/internal/domain/service"
 	"dynamic_mcp_go_server/internal/infrastructure/auth"
 	"dynamic_mcp_go_server/internal/infrastructure/database"
 	"dynamic_mcp_go_server/internal/infrastructure/store/httpservice"
@@ -92,6 +93,21 @@ func main() {
 		go startServiceManagerSync(ctx, serviceStore, httpServiceManager, appLogger)
 	}
 
+	// 创建 MCP Server 相关的服务和领域服务
+	var mcpServerService *service.MCPServerService
+	var toolService *service.ToolService
+	if gormDB != nil {
+		mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
+		tokenServerBindingDAO := database.NewGORMTokenServerBindingDAO(gormDB)
+		toolStore := database.NewGORMToolStore(gormDB)
+		toolServerBindingStore := database.NewGORMToolServerBindingDAO(gormDB)
+		mcpServerService = service.NewMCPServerService(mcpServerDAO, tokenServerBindingDAO, toolStore, toolServerBindingStore)
+
+		// 创建领域服务和应用服务
+		toolDomainService := domainService.NewToolDomainService(toolStore, mcpServerDAO, serviceStore)
+		toolService = service.NewToolService(toolDomainService)
+	}
+
 	appLogger.Info("MCP server started",
 		logger.String("store", string(cfg.Store)),
 		logger.String("mode", "streamable_http"),
@@ -100,7 +116,7 @@ func main() {
 		logger.String("tool_routes", "/mcp/{vauth_key}/{tool_name}"),
 	)
 
-	startHTTPServer(ctx, cfg, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, userService, jwtManager, appLogger)
+	startHTTPServer(ctx, cfg, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, userService, jwtManager, appLogger, mcpServerService, toolService)
 }
 
 func buildStore(cfg config.Config, log logger.Logger) (tooldef.Store, func(), error) {
@@ -111,10 +127,6 @@ func buildStore(cfg config.Config, log logger.Logger) (tooldef.Store, func(), er
 	gormDB, err := database.NewGORMDB(cfg.MySQLDSN)
 	if err != nil {
 		return nil, nil, fmt.Errorf("connect MySQL failed: %w", err)
-	}
-
-	if err := database.AutoMigrate(gormDB); err != nil {
-		return nil, nil, fmt.Errorf("MySQL auto migrate failed: %w", err)
 	}
 
 	enhancedStore := tooldef.NewEnhancedMySQLStore(gormDB, cfg.MySQLTable, log)
@@ -137,15 +149,6 @@ func initDatabase(cfg config.Config, log logger.Logger, authService *service.Aut
 	gormDB, err := database.NewGORMDB(cfg.MySQLDSN)
 	if err != nil {
 		log.Warn("connect MySQL failed", logger.Error(err))
-		return nil, nil
-	}
-
-	if err := database.AutoMigrate(gormDB); err != nil {
-		log.Warn("MySQL auto migrate failed", logger.Error(err))
-		sqlDB, _ := gormDB.DB()
-		if sqlDB != nil {
-			_ = sqlDB.Close()
-		}
 		return nil, nil
 	}
 
@@ -175,72 +178,73 @@ func buildUserServiceWithDB(gormDB *gorm.DB, log logger.Logger) (*service.UserSe
 func sampleDefinitions() []tooldef.ToolDefinition {
 	min := 1.0
 	max := 100.0
+
+	searchUsersParams, _ := json.Marshal([]tooldef.ParameterDefinition{
+		{
+			Name:        "query",
+			Type:        tooldef.ParameterTypeString,
+			Required:    true,
+			Description: "Search keyword.",
+		},
+		{
+			Name:        "limit",
+			Type:        tooldef.ParameterTypeInteger,
+			Required:    false,
+			Description: "Max rows to return.",
+			Default:     10,
+			Minimum:     &min,
+			Maximum:     &max,
+		},
+	})
+
+	setUserFlagParams, _ := json.Marshal([]tooldef.ParameterDefinition{
+		{
+			Name:        "user_id",
+			Type:        tooldef.ParameterTypeString,
+			Required:    true,
+			Description: "User identifier.",
+		},
+		{
+			Name:        "enabled",
+			Type:        tooldef.ParameterTypeBoolean,
+			Required:    true,
+			Description: "Flag value.",
+		},
+	})
+
+	getOrderSummaryParams, _ := json.Marshal([]tooldef.ParameterDefinition{
+		{
+			Name:        "order_id",
+			Type:        tooldef.ParameterTypeString,
+			Required:    true,
+			Description: "Order id.",
+		},
+		{
+			Name:     "include_items",
+			Type:     tooldef.ParameterTypeBoolean,
+			Required: false,
+			Default:  true,
+		},
+	})
+
 	return []tooldef.ToolDefinition{
 		{
-			VAuthKey:    "user-service",
-			ServerDesc:  "User profile management tools.",
 			Name:        "search_users",
 			Description: "Search users by keyword.",
 			Enabled:     true,
-			Parameters: []tooldef.ParameterDefinition{
-				{
-					Name:        "query",
-					Type:        tooldef.ParameterTypeString,
-					Required:    true,
-					Description: "Search keyword.",
-				},
-				{
-					Name:        "limit",
-					Type:        tooldef.ParameterTypeInteger,
-					Required:    false,
-					Description: "Max rows to return.",
-					Default:     10,
-					Minimum:     &min,
-					Maximum:     &max,
-				},
-			},
+			Parameters:  searchUsersParams,
 		},
 		{
-			VAuthKey:    "feature-service",
-			ServerDesc:  "Feature flag management tools.",
 			Name:        "set_user_flag",
 			Description: "Set feature flag for a user.",
 			Enabled:     true,
-			Parameters: []tooldef.ParameterDefinition{
-				{
-					Name:        "user_id",
-					Type:        tooldef.ParameterTypeString,
-					Required:    true,
-					Description: "User identifier.",
-				},
-				{
-					Name:        "enabled",
-					Type:        tooldef.ParameterTypeBoolean,
-					Required:    true,
-					Description: "Flag value.",
-				},
-			},
+			Parameters:  setUserFlagParams,
 		},
 		{
-			VAuthKey:    "order-service",
-			ServerDesc:  "Order management tools.",
 			Name:        "get_order_summary",
 			Description: "Get order summary by order id.",
 			Enabled:     true,
-			Parameters: []tooldef.ParameterDefinition{
-				{
-					Name:        "order_id",
-					Type:        tooldef.ParameterTypeString,
-					Required:    true,
-					Description: "Order id.",
-				},
-				{
-					Name:     "include_items",
-					Type:     tooldef.ParameterTypeBoolean,
-					Required: false,
-					Default:  true,
-				},
-			},
+			Parameters:  getOrderSummaryParams,
 		},
 	}
 }
@@ -258,10 +262,6 @@ func buildServiceStore(log logger.Logger) (repository.ServiceStore, func()) {
 		gormDB, err := database.NewGORMDB(storeCfg.MySQLDSN)
 		if err != nil {
 			log.Error("open GORM for HTTP service store failed", logger.Error(err))
-			return nil, nil
-		}
-		if err := database.AutoMigrate(gormDB); err != nil {
-			log.Error("auto migrate failed", logger.Error(err))
 			return nil, nil
 		}
 		store := httpservice.NewGORMServiceStore(gormDB, log)
@@ -342,6 +342,8 @@ func startHTTPServer(
 	userService *service.UserService,
 	jwtManager *auth.JWTManager,
 	log logger.Logger,
+	mcpServerService *service.MCPServerService,
+	toolService *service.ToolService,
 ) {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
@@ -355,7 +357,7 @@ func startHTTPServer(
 
 	engine.RedirectTrailingSlash = false
 
-	httpAPI.RegisterRoutes(engine, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, jwtManager, log)
+	httpAPI.RegisterRoutes(engine, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, jwtManager, log, mcpServerService, toolService)
 
 	if userService != nil && jwtManager != nil {
 		httpAPI.RegisterUserAuthRoutes(engine, userService, jwtManager)

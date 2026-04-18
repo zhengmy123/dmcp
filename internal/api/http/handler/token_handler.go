@@ -1,13 +1,13 @@
 package handler
 
 import (
+	"dynamic_mcp_go_server/internal/common/response"
+	"dynamic_mcp_go_server/internal/service"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-
-	"dynamic_mcp_go_server/internal/service"
 )
 
-// RegisterTokenRoutes 注册 Token 管理 API
 func RegisterTokenRoutes(g *gin.RouterGroup, authService *service.AuthService) {
 	g.GET("/tokens", listTokens(authService))
 	g.POST("/tokens", createToken(authService))
@@ -20,9 +20,11 @@ func RegisterTokenRoutes(g *gin.RouterGroup, authService *service.AuthService) {
 func listTokens(authService *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokens := authService.ListTokens(c.Request.Context())
-		c.JSON(200, gin.H{
-			"tokens": tokens,
-			"count":  len(tokens),
+		response.Success(c, gin.H{
+			"items":     tokens,
+			"total":     len(tokens),
+			"page":      1,
+			"page_size": len(tokens),
 		})
 	}
 }
@@ -36,11 +38,10 @@ func createToken(authService *service.AuthService) gin.HandlerFunc {
 			Name   string `json:"name"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(400, gin.H{"error": "invalid request", "details": err.Error()})
+			response.BadRequest(c, "invalid request: "+err.Error())
 			return
 		}
 
-		// 自动生成 KeyID、Token 和 Secret
 		if req.KeyID == "" {
 			req.KeyID = generateKeyID()
 		}
@@ -52,15 +53,14 @@ func createToken(authService *service.AuthService) gin.HandlerFunc {
 		}
 
 		if err := authService.RegisterToken(c.Request.Context(), req.KeyID, req.Token, req.Secret, req.Name); err != nil {
-			c.JSON(500, gin.H{"error": "failed to register token", "details": err.Error()})
+			response.InternalError(c, "failed to register token: "+err.Error())
 			return
 		}
 
-		c.JSON(201, gin.H{
-			"message": "token registered",
-			"key_id":  req.KeyID,
-			"token":   req.Token,
-			"secret":  req.Secret,
+		response.Created(c, gin.H{
+			"key_id": req.KeyID,
+			"token":  req.Token,
+			"secret": req.Secret,
 		})
 	}
 }
@@ -69,10 +69,10 @@ func deleteToken(authService *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if !authService.DeleteToken(c.Request.Context(), token) {
-			c.JSON(404, gin.H{"error": "token not found"})
+			response.NotFound(c, "token not found")
 			return
 		}
-		c.JSON(200, gin.H{"message": "token deleted", "token": token})
+		response.SuccessWithMessage(c, "token deleted", gin.H{"token": token})
 	}
 }
 
@@ -81,11 +81,10 @@ func refreshToken(authService *service.AuthService) gin.HandlerFunc {
 		token := c.Param("token")
 		newToken, newSecret, err := authService.RefreshToken(c.Request.Context(), token)
 		if err != nil {
-			c.JSON(404, gin.H{"error": err.Error()})
+			response.NotFound(c, err.Error())
 			return
 		}
-		c.JSON(200, gin.H{
-			"message":    "token refreshed",
+		response.Success(c, gin.H{
 			"old_token":  token,
 			"new_token":  newToken,
 			"new_secret": newSecret,
@@ -97,10 +96,10 @@ func enableToken(authService *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if !authService.EnableToken(c.Request.Context(), token) {
-			c.JSON(404, gin.H{"error": "token not found"})
+			response.NotFound(c, "token not found")
 			return
 		}
-		c.JSON(200, gin.H{"message": "token enabled", "token": token})
+		response.SuccessWithMessage(c, "token enabled", gin.H{"token": token})
 	}
 }
 
@@ -108,10 +107,10 @@ func disableToken(authService *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.Param("token")
 		if !authService.DisableToken(c.Request.Context(), token) {
-			c.JSON(404, gin.H{"error": "token not found"})
+			response.NotFound(c, "token not found")
 			return
 		}
-		c.JSON(200, gin.H{"message": "token disabled", "token": token})
+		response.SuccessWithMessage(c, "token disabled", gin.H{"token": token})
 	}
 }
 

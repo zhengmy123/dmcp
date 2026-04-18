@@ -1,7 +1,7 @@
 package service
 
 import (
-	"encoding/json"
+	"github.com/bytedance/sonic"
 	"net/http"
 	"strings"
 	"time"
@@ -37,7 +37,11 @@ func NewHTTPHandler(registry *DynamicRegistry) http.Handler {
 func writeJSON(w http.ResponseWriter, status int, payload map[string]any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+	data, err := sonic.Marshal(payload)
+	if err != nil {
+		return
+	}
+	_, _ = w.Write(data)
 }
 
 func handleGroupRoute(w http.ResponseWriter, r *http.Request, registry *DynamicRegistry) {

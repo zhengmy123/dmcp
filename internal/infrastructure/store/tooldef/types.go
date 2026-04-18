@@ -26,7 +26,6 @@ type toolDefinitionJSON struct {
 	Description string                `json:"description"`
 	Parameters  []ParameterDefinition `json:"parameters"`
 	Enabled     *bool                 `json:"enabled"`
-	VAuthKey    string                `json:"vauth_key"`
 	ServerDesc  string                `json:"server_desc,omitempty"`
 }
 

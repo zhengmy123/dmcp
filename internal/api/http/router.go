@@ -8,7 +8,6 @@ import (
 	apimw "dynamic_mcp_go_server/internal/api/middleware"
 	"dynamic_mcp_go_server/internal/common/logger"
 	"dynamic_mcp_go_server/internal/domain/repository"
-	domainService "dynamic_mcp_go_server/internal/domain/service"
 	"dynamic_mcp_go_server/internal/infrastructure/auth"
 	"dynamic_mcp_go_server/internal/infrastructure/database"
 	"dynamic_mcp_go_server/internal/service"
@@ -28,6 +27,8 @@ func RegisterRoutes(
 	gormDB *gorm.DB,
 	jwtManager *auth.JWTManager,
 	log logger.Logger,
+	mcpServerService *service.MCPServerService,
+	toolService *service.ToolService,
 ) {
 	metadataHandler := service.NewHTTPHandler(registry)
 	scopedMCPHandler := service.NewScopedMCPHandler(groupManager)
@@ -64,20 +65,9 @@ func RegisterRoutes(
 	}
 
 	// MCP Server 管理路由 (需要 JWT 认证)
-	if jwtManager != nil {
+	if jwtManager != nil && mcpServerService != nil && toolService != nil {
 		mcpGroup := e.Group("/api/admin")
 		mcpGroup.Use(apimw.JWTAuth(jwtManager))
-
-		// 初始化 repository 和 service
-		mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
-		tokenServerBindingDAO := database.NewGORMTokenServerBindingDAO(gormDB)
-		toolStore := database.NewGORMToolStore(gormDB)
-		serviceStore := database.NewGORMServiceDAO(gormDB, log)
-		mcpServerService := service.NewMCPServerService(mcpServerDAO, tokenServerBindingDAO, toolStore)
-
-		// 初始化 domain service 和 application service
-		toolDomainService := domainService.NewToolDomainService(toolStore, mcpServerDAO, serviceStore)
-		toolService := service.NewToolService(toolDomainService)
 
 		mcpHandler := mcp.NewMCPServerHandler(mcpServerService, toolService, gormDB, log)
 		mcpGroup.GET("/mcp-servers", mcpHandler.ListServers)
@@ -98,6 +88,19 @@ func RegisterRoutes(
 		mcpGroup.DELETE("/tools/:id", toolHandler.DeleteTool)
 
 		mcpGroup.GET("/http-services/:id/output-schema", toolHandler.GetHTTPServiceOutputSchema)
+
+		toolBindingDAO := database.NewGORMToolServerBindingDAO(gormDB)
+		toolStore := database.NewGORMToolStore(gormDB)
+		mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
+		toolBindingService := service.NewToolBindingService(toolBindingDAO, toolStore, mcpServerDAO)
+		toolBindingHandler := mcp.NewToolBindingHandler(toolBindingService, log)
+
+		mcpGroup.GET("/tool-bindings/:toolId", toolBindingHandler.GetToolBindings)
+		mcpGroup.POST("/tool-bindings", toolBindingHandler.BindTool)
+		mcpGroup.DELETE("/tool-bindings/:toolId/:serverId", toolBindingHandler.UnbindTool)
+		mcpGroup.POST("/tool-bindings/batch-bind", toolBindingHandler.BatchBind)
+		mcpGroup.DELETE("/tool-bindings/batch-unbind", toolBindingHandler.BatchUnbind)
+		mcpGroup.GET("/server-bindings/:serverId", toolBindingHandler.GetServerBindings)
 	}
 }
 
