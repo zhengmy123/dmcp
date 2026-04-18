@@ -20,14 +20,13 @@ CREATE TABLE IF NOT EXISTS `mcp_auth_keys` (
     `key` VARCHAR(256) NOT NULL COMMENT '认证密钥',
     `name` VARCHAR(128) NOT NULL COMMENT '密钥名称',
     `description` VARCHAR(512) DEFAULT '' COMMENT '密钥描述',
-    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    `state` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态 1-正常 0-删除',
     `last_used_at` DATETIME DEFAULT NULL COMMENT '最后使用时间',
     `expires_at` DATETIME DEFAULT NULL COMMENT '过期时间',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_key` (`key`),
-    INDEX `idx_enabled` (`enabled`),
     INDEX `idx_expires_at` (`expires_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='认证密钥表';
 
@@ -40,6 +39,7 @@ CREATE TABLE IF NOT EXISTS `mcp_servers` (
     `name` VARCHAR(128) NOT NULL COMMENT '服务名称',
     `description` VARCHAR(512) DEFAULT '' COMMENT '服务描述',
     `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    `state` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态 1-正常 0-删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -69,6 +69,7 @@ CREATE TABLE IF NOT EXISTS `mcp_http_services` (
     `input_schema` TEXT COMMENT '入参JSON Schema',
     `output_schema` TEXT COMMENT '出参JSON Schema',
     `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    `state` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态 1-正常 0-删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS `mcp_tool_definitions` (
     `input_mapping` TEXT COMMENT '入参映射配置',
     `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
     `output_mapping` TEXT COMMENT '出参映射配置',
+    `state` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态 1-正常 0-删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -108,6 +110,7 @@ CREATE TABLE IF NOT EXISTS `tool_mcp_server_bindings` (
     `tool_id` INT UNSIGNED NOT NULL COMMENT '工具ID',
     `server_id` INT UNSIGNED NOT NULL COMMENT '服务ID',
     `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    `state` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态 1-正常 0-删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
@@ -120,26 +123,7 @@ CREATE TABLE IF NOT EXISTS `tool_mcp_server_bindings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='工具与MCP Server绑定表';
 
 -- ============================================
--- 步骤6: 创建 token_mcp_server_bindings 表（Token与服务绑定）
--- ============================================
-CREATE TABLE IF NOT EXISTS `token_mcp_server_bindings` (
-    `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `token_id` INT UNSIGNED NOT NULL COMMENT '认证密钥ID',
-    `server_id` INT UNSIGNED NOT NULL COMMENT '服务ID',
-    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
-    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_token_server` (`token_id`, `server_id`),
-    INDEX `idx_token_id` (`token_id`),
-    INDEX `idx_server_id` (`server_id`),
-    INDEX `idx_enabled` (`enabled`),
-    INDEX `idx_created_at` (`created_at`),
-    INDEX `idx_updated_at` (`updated_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Token与服务绑定表';
-
--- ============================================
--- 步骤7: 创建 users 表（用户表）
+-- 步骤6: 创建 users 表（用户表）
 -- ============================================
 CREATE TABLE IF NOT EXISTS `users` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
@@ -149,6 +133,7 @@ CREATE TABLE IF NOT EXISTS `users` (
     `nickname` VARCHAR(128) DEFAULT '' COMMENT '昵称',
     `role` VARCHAR(32) NOT NULL DEFAULT 'user' COMMENT '角色',
     `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    `state` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态 1-正常 0-删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),

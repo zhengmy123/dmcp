@@ -28,6 +28,44 @@
       </div>
     </div>
 
+    <!-- Search Filters -->
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <div class="flex flex-wrap gap-4">
+        <div class="flex-1 min-w-[200px]">
+          <input
+            v-model="searchForm.name"
+            type="text"
+            placeholder="搜索名称..."
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            @keyup.enter="handleSearch"
+          >
+        </div>
+        <div class="w-40">
+          <select
+            v-model="searchForm.state"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            @change="handleSearch"
+          >
+            <option value="">全部状态</option>
+            <option :value="1">正常</option>
+            <option :value="0">已删除</option>
+          </select>
+        </div>
+        <button
+          @click="handleSearch"
+          class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700"
+        >
+          搜索
+        </button>
+        <button
+          @click="handleReset"
+          class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+        >
+          重置
+        </button>
+      </div>
+    </div>
+
     <!-- Loading -->
     <div v-if="mcpServersStore.loading" class="text-center py-12">
       <div class="loading-spinner mx-auto"></div>
@@ -53,7 +91,7 @@
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VAuth Key</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">工具数</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">启用状态</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">描述</th>
             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
           </tr>
@@ -75,15 +113,15 @@
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span class="px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-                {{ server.tools?.length || 0 }} 个工具
+                {{ server.tool_count || 0 }} 个工具
               </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span
                 class="px-2.5 py-1 text-xs font-medium rounded-full"
-                :class="server.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                :class="server.state === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
               >
-                {{ server.enabled ? '启用' : '禁用' }}
+                {{ server.state === 1 ? '正常' : '已删除' }}
               </span>
             </td>
             <td class="px-6 py-4">
@@ -110,12 +148,23 @@
                   </svg>
                 </button>
                 <button
+                  v-if="server.state === 1"
                   @click="handleDelete(server)"
                   class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   title="删除"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+                <button
+                  v-else
+                  @click="handleRestore(server)"
+                  class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                  title="启用"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                   </svg>
                 </button>
               </div>
@@ -171,13 +220,6 @@
                     <p class="text-xs text-gray-400 mt-1">可选，连接外部 MCP Server</p>
                   </div>
 
-                  <div class="flex items-center">
-                    <label class="flex items-center">
-                      <input v-model="form.enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
-                      <span class="ml-2 text-sm text-gray-700">启用 Server</span>
-                    </label>
-                  </div>
-
                   <div class="flex justify-end space-x-3 pt-4">
                     <button type="button" @click="showModal = false"
                       class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
@@ -202,6 +244,9 @@
       :selected-server="selectedServerForBinding"
       @close="showBindingDialog = false"
     />
+
+    <!-- Confirm Dialog -->
+    <ConfirmDialog ref="confirmDialog" />
   </div>
 </template>
 
@@ -209,6 +254,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useMCPServersStore } from '@/stores/mcpServers'
 import ServerBindingDialog from '@/components/ServerBindingDialog.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 const mcpServersStore = useMCPServersStore()
 
@@ -216,13 +262,31 @@ const showModal = ref(false)
 const editingServer = ref(null)
 const showBindingDialog = ref(false)
 const selectedServerForBinding = ref(null)
+const confirmDialog = ref(null)
+
+const searchForm = reactive({
+  name: '',
+  state: ''
+})
+
+const handleSearch = () => {
+  mcpServersStore.fetchServers({
+    name: searchForm.name,
+    state: searchForm.state === '' ? undefined : parseInt(searchForm.state)
+  })
+}
+
+const handleReset = () => {
+  searchForm.name = ''
+  searchForm.state = ''
+  mcpServersStore.fetchServers({})
+}
 
 const form = reactive({
   name: '',
   vauth_key: '',
   description: '',
-  http_server_url: '',
-  enabled: true
+  http_server_url: ''
 })
 
 const openBindingDialog = (server) => {
@@ -238,10 +302,9 @@ const openCreateModal = () => {
   editingServer.value = null
   Object.assign(form, {
     name: '',
-    vauth_key: '', // 创建时留空，后端自动生成
+    vauth_key: '',
     description: '',
-    http_server_url: '',
-    enabled: true
+    http_server_url: ''
   })
   showModal.value = true
 }
@@ -252,8 +315,7 @@ const openEditModal = (server) => {
     name: server.name,
     vauth_key: server.vauth_key,
     description: server.description || '',
-    http_server_url: server.http_server_url || '',
-    enabled: server.enabled
+    http_server_url: server.http_server_url || ''
   })
   showModal.value = true
 }
@@ -272,11 +334,34 @@ const handleSubmit = async () => {
 }
 
 const handleDelete = async (server) => {
-  if (!confirm(`确定要删除 Server "${server.name}" 吗？`)) return
+  const confirmed = await confirmDialog.value.show({
+    title: '确认删除',
+    message: `确定要删除 Server "${server.name}" 吗？\n\n删除后该服务器将被禁用，但可以重新启用。`,
+    type: 'danger',
+    confirmText: '删除',
+    cancelText: '取消'
+  })
+  if (!confirmed) return
   try {
     await mcpServersStore.deleteServer(server.id)
   } catch (e) {
     console.error('删除失败:', e)
+  }
+}
+
+const handleRestore = async (server) => {
+  const confirmed = await confirmDialog.value.show({
+    title: '确认启用',
+    message: `确定要启用 Server "${server.name}" 吗？\n\n启用后该服务器将恢复正常使用。`,
+    type: 'info',
+    confirmText: '启用',
+    cancelText: '取消'
+  })
+  if (!confirmed) return
+  try {
+    await mcpServersStore.restoreServer(server.id)
+  } catch (e) {
+    console.error('启用失败:', e)
   }
 }
 

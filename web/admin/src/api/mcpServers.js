@@ -2,8 +2,8 @@ import { request } from './index'
 
 export const mcpServerAPI = {
   // 获取所有 MCPServer
-  list() {
-    return request.get('/api/admin/mcp-servers')
+  list(params = {}) {
+    return request.get('/api/admin/mcp-servers', { params })
   },
 
   // 获取单个 MCPServer
@@ -24,6 +24,11 @@ export const mcpServerAPI = {
   // 删除 MCPServer
   delete(id) {
     return request.delete(`/api/admin/mcp-servers/${id}`)
+  },
+
+  // 恢复 MCPServer
+  restore(id) {
+    return request.post(`/api/admin/mcp-servers/${id}/restore`)
   },
 
   // 获取 Server 关联的工具

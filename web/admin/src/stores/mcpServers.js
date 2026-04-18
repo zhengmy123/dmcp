@@ -15,11 +15,11 @@ export const useMCPServersStore = defineStore('mcpServers', () => {
   })
 
   // 获取所有 Server
-  const fetchServers = async () => {
+  const fetchServers = async (params = {}) => {
     loading.value = true
     error.value = null
     try {
-      const res = await mcpServerAPI.list()
+      const res = await mcpServerAPI.list(params)
       const data = res.data || res
       const items = data.servers || data.items || []
       servers.value = items
@@ -104,6 +104,21 @@ export const useMCPServersStore = defineStore('mcpServers', () => {
     }
   }
 
+  // 恢复 Server
+  const restoreServer = async (id) => {
+    loading.value = true
+    error.value = null
+    try {
+      await mcpServerAPI.restore(id)
+      await fetchServers()
+    } catch (e) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 添加工具到 Server
   const addToolsToServer = async (id, toolNames) => {
     loading.value = true
@@ -146,6 +161,7 @@ export const useMCPServersStore = defineStore('mcpServers', () => {
     createServer,
     updateServer,
     deleteServer,
+    restoreServer,
     addToolsToServer,
     removeToolFromServer
   }

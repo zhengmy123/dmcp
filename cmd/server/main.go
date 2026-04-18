@@ -98,10 +98,9 @@ func main() {
 	var toolService *service.ToolService
 	if gormDB != nil {
 		mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
-		tokenServerBindingDAO := database.NewGORMTokenServerBindingDAO(gormDB)
 		toolStore := database.NewGORMToolStore(gormDB)
 		toolServerBindingStore := database.NewGORMToolServerBindingDAO(gormDB)
-		mcpServerService = service.NewMCPServerService(mcpServerDAO, tokenServerBindingDAO, toolStore, toolServerBindingStore)
+		mcpServerService = service.NewMCPServerService(mcpServerDAO, toolStore, toolServerBindingStore)
 
 		// 创建领域服务和应用服务
 		toolDomainService := domainService.NewToolDomainService(toolStore, mcpServerDAO, serviceStore)

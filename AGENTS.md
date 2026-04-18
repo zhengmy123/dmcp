@@ -108,6 +108,7 @@ if err != nil {
 type User struct {
     ID        uint      `gorm:"primaryKey;autoIncrement"`
     Name      string    `gorm:"size:128;not null"`
+    State     int       `gorm:"default:1;comment:状态 1-正常 0-删除"`
     CreatedAt time.Time `gorm:"autoCreateTime"`
     UpdatedAt time.Time `gorm:"autoUpdateTime"`
 }
@@ -117,7 +118,72 @@ func (User) TableName() string {
 }
 ```
 
-#### 4. 函数/方法参数
+#### 4. 软删除
+- **所有删除操作都是软删除**，通过 `state` 字段来区分
+- `state` 字段约定：`1` 表示正常状态，`0` 表示已删除
+- 查询时默认过滤 `state = 1` 的记录
+- 删除操作时将 `state` 设为 `0`，而不是真正删除记录
+- 需要查询包括软删除的记录时，使用 `Unscoped()` 或单独的查询方法
+
+#### 5. 批量软删除操作规范
+- **必须**采用「先批量查询，再分三种情况处理」的模式：
+  1. **已有效**（state=1）：保持不变
+  2. **已失效**（state=0）：恢复或跳过
+  3. **不存在**：新增
+
+- 示例流程（批量绑定）：
+
+```go
+func (s *Service) BatchBind(ctx context.Context, req BatchRequest) (int, error) {
+    // 1. 批量查询所有记录（包括软删除）
+    allBindings, err := s.store.ListAllIncludeDeleted(ctx)
+    if err != nil {
+        return 0, err
+    }
+
+    // 2. 构建存在性Map
+    existingMap := make(map[uint]map[uint]int)
+    for _, b := range allBindings {
+        if existingMap[b.ToolID] == nil {
+            existingMap[b.ToolID] = make(map[uint]int)
+        }
+        existingMap[b.ToolID][b.ServerID] = b.State
+    }
+
+    // 3. 分三种情况处理
+    var toRestore []uint    // 失效 -> 有效
+    var toCreate []*Model   // 不存在 -> 新增
+
+    for _, toolID := range req.ToolIDs {
+        for _, serverID := range req.ServerIDs {
+            state, exists := existingMap[toolID][serverID]
+            if !exists {
+                // 不存在：新增
+                toCreate = append(toCreate, &Model{ToolID: toolID, ServerID: serverID})
+            } else if state == 0 {
+                // 已失效：恢复
+                binding, _ := s.store.GetByToolAndServerIncludeDeleted(ctx, toolID, serverID)
+                if binding != nil {
+                    toRestore = append(toRestore, binding.ID)
+                }
+            }
+            // 已有效：跳过
+        }
+    }
+
+    // 4. 批量执行
+    if len(toRestore) > 0 {
+        s.store.BatchRestore(ctx, toRestore)
+    }
+    if len(toCreate) > 0 {
+        s.store.BatchSave(ctx, toCreate)
+    }
+
+    return len(toRestore) + len(toCreate), nil
+}
+```
+
+#### 6. 函数/方法参数
 - 优先使用结构体作为函数和方法的入参和出参
 - 避免使用过多的独立参数
 
@@ -139,7 +205,7 @@ func CreateTool(name string, description string, parameters []byte) (*Tool, erro
 }
 ```
 
-#### 5. Infrastructure 层查询
+#### 7. Infrastructure 层查询
 - Infrastructure 层的查询是泛化的
 - 传入的 query 参数是结构体指针
 - 根据结构体的字段进行查询
@@ -187,7 +253,9 @@ web/admin/src/
 
 #### 2. 接口文档
 - 编写页面功能时参考 `docs/api/` 下的接口文档
-- 接口修改后要及时更新接口文档
+- **修改接口后必须立即同步更新接口文档**
+- 接口文档应包含：请求参数、响应格式、字段说明
+- 保持文档格式一致
 
 #### 3. UI 规范
 - **错误提示要在最上层显眼的位置**：错误消息应显示在页面或组件的顶部，使用醒目的颜色（如红色）并带有明显的视觉样式，确保用户第一时间能看到错误信息
@@ -246,8 +314,9 @@ test/
 - `docs/superpowers/` - 功能规格和计划
 
 ### 接口文档更新
-- 修改接口后**必须**及时更新 `docs/api/` 下的对应文档
+- 修改接口后**必须立即同步更新** `docs/api/` 下的对应文档
 - 文档格式保持一致
+- 文档应包含完整的请求参数、响应格式、字段说明
 
 ---
 
@@ -263,6 +332,8 @@ test/
 8. ✅ golang json 库使用 sonic json
 9. ✅ 编写页面功能时可以参考下项目中 docs/api/ 的接口文档，接口修改后要及时更新接口文档
 10. ✅ 错误提示要在最上层显眼的位置
+11. ✅ 所有删除都是软删除，通过 state 字段来区分（1-正常，0-删除）
+12. ✅ 批量软删除操作采用「先批量查询，再分三种情况处理」的模式
 
 ---
 

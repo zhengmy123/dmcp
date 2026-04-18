@@ -20,7 +20,6 @@ var (
 // MCPServerService 提供 MCPServer 的业务逻辑
 type MCPServerService struct {
 	serverStore        repository.MCPServerStore
-	bindingStore       repository.TokenServerBindingStore
 	toolStore          repository.ToolStore
 	toolServerBindingStore repository.ToolServerBindingStore
 }
@@ -28,13 +27,11 @@ type MCPServerService struct {
 // NewMCPServerService 创建 MCPServerService
 func NewMCPServerService(
 	serverStore repository.MCPServerStore,
-	bindingStore repository.TokenServerBindingStore,
 	toolStore repository.ToolStore,
 	toolServerBindingStore repository.ToolServerBindingStore,
 ) *MCPServerService {
 	return &MCPServerService{
 		serverStore:        serverStore,
-		bindingStore:       bindingStore,
 		toolStore:          toolStore,
 		toolServerBindingStore: toolServerBindingStore,
 	}
@@ -43,6 +40,17 @@ func NewMCPServerService(
 // ListServers 获取所有 MCPServer
 func (s *MCPServerService) ListServers(ctx context.Context) ([]*model.MCPServer, error) {
 	return s.serverStore.List(ctx)
+}
+
+// ListServersWithToolCount 分页获取 MCPServer 并统计工具数量
+func (s *MCPServerService) ListServersWithToolCount(ctx context.Context, page, pageSize int, name string, state *int) ([]*repository.MCPServerWithToolCount, int64, error) {
+	query := &repository.MCPServerQuery{
+		Page:     page,
+		PageSize: pageSize,
+		Name:     name,
+		State:    state,
+	}
+	return s.serverStore.ListWithToolCount(ctx, query)
 }
 
 // GetServer 获取单个 MCPServer
@@ -113,6 +121,11 @@ func (s *MCPServerService) DeleteServer(ctx context.Context, id uint) error {
 	}
 
 	return s.serverStore.Delete(ctx, id)
+}
+
+// RestoreServer 恢复 MCPServer
+func (s *MCPServerService) RestoreServer(ctx context.Context, id uint) error {
+	return s.serverStore.Restore(ctx, id)
 }
 
 // GetServerTools 获取 Server 下的所有工具

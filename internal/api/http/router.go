@@ -75,6 +75,7 @@ func RegisterRoutes(
 		mcpGroup.POST("/mcp-servers", mcpHandler.CreateServer)
 		mcpGroup.PUT("/mcp-servers/:id", mcpHandler.UpdateServer)
 		mcpGroup.DELETE("/mcp-servers/:id", mcpHandler.DeleteServer)
+		mcpGroup.POST("/mcp-servers/:id/restore", mcpHandler.RestoreServer)
 		mcpGroup.GET("/mcp-servers/:id/tools", mcpHandler.GetServerTools)
 		mcpGroup.POST("/mcp-servers/:id/tools", mcpHandler.AddToolsToServer)
 		mcpGroup.DELETE("/mcp-servers/:id/tools/:toolName", mcpHandler.RemoveToolFromServer)

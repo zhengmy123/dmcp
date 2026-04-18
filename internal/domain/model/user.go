@@ -13,6 +13,7 @@ type User struct {
 	Email        string    `json:"email" gorm:"size:256"`         // 邮箱
 	Role         string    `json:"role" gorm:"size:32"`          // 角色: admin, user
 	Enabled      bool      `json:"enabled"`       // 是否启用
+	State        int       `json:"state" gorm:"default:1;comment:状态 1-正常 0-删除"` // 状态
 	LastLoginAt  time.Time `json:"last_login_at"` // 最后登录时间
 	CreatedAt    time.Time `json:"created_at"`   // 创建时间
 	UpdatedAt    time.Time `json:"updated_at"`    // 更新时间

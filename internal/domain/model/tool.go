@@ -43,6 +43,7 @@ type ToolDefinition struct {
 	InputMapping  []byte    `json:"input_mapping" gorm:"type:text"`
 	Enabled       bool      `json:"enabled" gorm:"default:true"`
 	OutputMapping []byte    `json:"output_mapping" gorm:"type:text"`
+	State         int       `json:"state" gorm:"default:1;comment:状态 1-正常 0-删除"`
 	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }

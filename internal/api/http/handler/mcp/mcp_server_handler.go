@@ -37,15 +37,71 @@ func NewMCPServerHandler(svc *service.MCPServerService, toolSvc *service.ToolSer
 	}
 }
 
+type ListServersResponse struct {
+	Servers   []*ServerWithToolCount `json:"servers"`
+	Total     int64                  `json:"total"`
+	Page      int                    `json:"page"`
+	PageSize  int                    `json:"page_size"`
+	TotalPage int64                  `json:"total_page"`
+}
+
+type ServerWithToolCount struct {
+	*model.MCPServer
+	ToolCount int64 `json:"tool_count"`
+}
+
 func (h *MCPServerHandler) ListServers(ctx *gin.Context) {
-	servers, err := h.service.ListServers(ctx.Request.Context())
+	pageStr := ctx.DefaultQuery("page", "1")
+	pageSizeStr := ctx.DefaultQuery("page_size", "10")
+	name := ctx.Query("name")
+	stateStr := ctx.Query("state")
+
+	page, err := strconv.Atoi(pageStr)
+	if err != nil || page < 1 {
+		page = 1
+	}
+
+	pageSize, err := strconv.Atoi(pageSizeStr)
+	if err != nil || pageSize < 1 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	var state *int
+	if stateStr != "" {
+		s, err := strconv.Atoi(stateStr)
+		if err == nil && (s == 0 || s == 1) {
+			state = &s
+		}
+	}
+
+	serversWithCount, total, err := h.service.ListServersWithToolCount(ctx.Request.Context(), page, pageSize, name, state)
 	if err != nil {
 		response.InternalError(ctx, err.Error())
 		return
 	}
-	response.Success(ctx, gin.H{
-		"servers": servers,
-		"count":   len(servers),
+
+	servers := make([]*ServerWithToolCount, len(serversWithCount))
+	for i, sc := range serversWithCount {
+		servers[i] = &ServerWithToolCount{
+			MCPServer: sc.Server,
+			ToolCount: sc.ToolCount,
+		}
+	}
+
+	totalPage := total / int64(pageSize)
+	if total%int64(pageSize) != 0 {
+		totalPage++
+	}
+
+	response.Success(ctx, ListServersResponse{
+		Servers:   servers,
+		Total:     total,
+		Page:      page,
+		PageSize:  pageSize,
+		TotalPage: totalPage,
 	})
 }
 
@@ -76,7 +132,6 @@ type CreateServerRequest struct {
 	Type           string `json:"type" binding:"required"`
 	Name           string `json:"name" binding:"required"`
 	Description    string `json:"description"`
-	Enabled        *bool  `json:"enabled"`
 	HTTPServerURL  string `json:"http_server_url"`
 	AuthHeader     string `json:"auth_header"`
 	TimeoutSeconds int    `json:"timeout_seconds"`
@@ -101,10 +156,6 @@ func (h *MCPServerHandler) CreateServer(ctx *gin.Context) {
 		AuthHeader:     req.AuthHeader,
 		TimeoutSeconds: req.TimeoutSeconds,
 		ExtraHeaders:   req.ExtraHeaders,
-		Enabled:        true,
-	}
-	if req.Enabled != nil {
-		server.Enabled = *req.Enabled
 	}
 
 	if err := h.service.CreateServer(ctx.Request.Context(), &server); err != nil {
@@ -126,7 +177,6 @@ type UpdateServerRequest struct {
 	Type           string `json:"type"`
 	Name           string `json:"name"`
 	Description    string `json:"description"`
-	Enabled        *bool  `json:"enabled"`
 	HTTPServerURL  string `json:"http_server_url"`
 	AuthHeader     string `json:"auth_header"`
 	TimeoutSeconds int    `json:"timeout_seconds"`
@@ -162,9 +212,6 @@ func (h *MCPServerHandler) UpdateServer(ctx *gin.Context) {
 	}
 	if req.Description != "" {
 		server.Description = req.Description
-	}
-	if req.Enabled != nil {
-		server.Enabled = *req.Enabled
 	}
 	if req.Type != "" {
 		server.Type = req.Type
@@ -210,6 +257,28 @@ func (h *MCPServerHandler) DeleteServer(ctx *gin.Context) {
 	}
 
 	if err := h.service.DeleteServer(ctx.Request.Context(), uint(id)); err != nil {
+		if err == service.ErrMCPServerNotFound {
+			response.NotFound(ctx, "mcp server not found")
+			return
+		}
+		response.InternalError(ctx, err.Error())
+		return
+	}
+
+	response.Success(ctx, gin.H{
+		"server_id": id,
+	})
+}
+
+func (h *MCPServerHandler) RestoreServer(ctx *gin.Context) {
+	idParam := ctx.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		response.BadRequest(ctx, "invalid server id")
+		return
+	}
+
+	if err := h.service.RestoreServer(ctx.Request.Context(), uint(id)); err != nil {
 		if err == service.ErrMCPServerNotFound {
 			response.NotFound(ctx, "mcp server not found")
 			return

@@ -6,7 +6,15 @@
 
 ### GET /api/admin/mcp-servers
 
-获取 MCP Server 列表。
+获取 MCP Server 列表（支持分页和搜索）。
+
+**查询参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| page | int | 否 | 页码，默认 1 |
+| page_size | int | 否 | 每页数量，默认 10，最大 100 |
+| name | string | 否 | 名称搜索（模糊匹配） |
+| state | int | 否 | 状态筛选：1-正常，0-已删除 |
 
 **响应示例**:
 ```json
@@ -14,11 +22,41 @@
   "code": 0,
   "message": "success",
   "data": {
-    "servers": [ ... ],
-    "count": 10
+    "servers": [
+      {
+        "id": 1,
+        "name": "server1",
+        "type": "http_service",
+        "vauth_key": "abc123",
+        "description": "",
+        "http_server_url": "",
+        "auth_header": "",
+        "timeout_seconds": 30,
+        "extra_headers": "",
+        "state": 1,
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z",
+        "tool_count": 5
+      }
+    ],
+    "total": 100,
+    "page": 1,
+    "page_size": 10,
+    "total_page": 10
   }
 }
 ```
+
+**响应字段说明**:
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| servers | array | 服务器列表 |
+| servers[].tool_count | int | 绑定的工具数量 |
+| servers[].state | int | 状态：1-正常，0-已删除 |
+| total | int | 总记录数 |
+| page | int | 当前页码 |
+| page_size | int | 每页数量 |
+| total_page | int | 总页数 |
 
 ### GET /api/admin/mcp-servers/:id
 
@@ -39,7 +77,6 @@
   "type": "string",
   "name": "string",
   "description": "string",
-  "enabled": true,
   "http_server_url": "string",
   "auth_header": "string",
   "timeout_seconds": 30,
@@ -47,7 +84,7 @@
 }
 ```
 
-**说明**: type 可以是 "local" 或 "http"
+**说明**: type 可以是 "local" 或 "http_service"
 
 ### PUT /api/admin/mcp-servers/:id
 
@@ -64,7 +101,16 @@
 
 ### DELETE /api/admin/mcp-servers/:id
 
-删除 MCP Server。
+删除 MCP Server（软删除）。
+
+**路径参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | uint | 是 | 服务器 ID |
+
+### POST /api/admin/mcp-servers/:id/restore
+
+恢复已删除的 MCP Server。
 
 **路径参数**:
 | 参数 | 类型 | 必填 | 说明 |

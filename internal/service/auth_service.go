@@ -18,13 +18,13 @@ import (
 
 // AuthKey 认证密钥配置
 type AuthKey struct {
-	ID        uint    `json:"id"`        // 主键ID
-	KeyID     string  `json:"key_id"`    // 访问密钥ID
-	Token     string  `json:"token"`     // 访问令牌(Token)
-	Secret    string  `json:"secret"`    // 密钥Secret
-	Name      string  `json:"name"`      // 密钥名称/描述
-	Enabled   bool    `json:"enabled"`   // 是否启用
-	LastUsed  *string `json:"last_used"` // 最后使用时间
+	ID        uint    `json:"id"`                                          // 主键ID
+	KeyID     string  `json:"key_id"`                                      // 访问密钥ID
+	Token     string  `json:"token"`                                       // 访问令牌(Token)
+	Secret    string  `json:"secret"`                                      // 密钥Secret
+	Name      string  `json:"name"`                                        // 密钥名称/描述
+	State     int     `json:"state" gorm:"default:1;comment:状态 1-正常 0-删除"` // 状态
+	LastUsed  *string `json:"last_used"`                                   // 最后使用时间
 	ExpiresAt string  `json:"expires_at"`
 	CreatedAt string  `json:"created_at"`
 	UpdatedAt string  `json:"updated_at"`
@@ -32,7 +32,7 @@ type AuthKey struct {
 
 // AuthService 认证管理服务
 type AuthService struct {
-	adminToken string            // 后台管理 API Token
+	adminToken string              // 后台管理 API Token
 	authKeys   map[string]*AuthKey // token -> config
 	mu         sync.RWMutex
 	db         *gorm.DB
@@ -93,7 +93,7 @@ type authKeyRow struct {
 	Token     string  `gorm:"column:token"`
 	Secret    string  `gorm:"column:secret"`
 	Name      *string `gorm:"column:name"`
-	Enabled   bool    `gorm:"column:enabled"`
+	State     int     `gorm:"column:state"`
 	LastUsed  *string `gorm:"column:last_used_at"`
 	ExpiresAt *string `gorm:"column:expires_at"`
 	CreatedAt *string `gorm:"column:created_at"`
@@ -106,7 +106,7 @@ func (s *AuthService) loadTokensFromDB() error {
 	}
 
 	var rows []authKeyRow
-	result := s.db.Table(s.tableName).Where("enabled = ?", true).Find(&rows)
+	result := s.db.Table(s.tableName).Where("state = ?", 1).Find(&rows)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -114,11 +114,11 @@ func (s *AuthService) loadTokensFromDB() error {
 	newKeys := make(map[string]*AuthKey)
 	for _, r := range rows {
 		key := &AuthKey{
-			ID:      r.ID,
-			KeyID:   r.KeyID,
-			Token:   r.Token,
-			Secret:  r.Secret,
-			Enabled: r.Enabled,
+			ID:     r.ID,
+			KeyID:  r.KeyID,
+			Token:  r.Token,
+			Secret: r.Secret,
+			State:  r.State,
 		}
 		if r.Name != nil {
 			key.Name = *r.Name
@@ -156,7 +156,7 @@ func (s *AuthService) ValidateToken(token string) (bool, bool) {
 		return false, false
 	}
 
-	if !key.Enabled {
+	if key.State != 1 {
 		return false, false
 	}
 
@@ -198,7 +198,7 @@ func (s *AuthService) RegisterToken(ctx context.Context, keyID, token, secret, n
 		Token:     token,
 		Secret:    secret,
 		Name:      name,
-		Enabled:   true,
+		State:     1,
 		CreatedAt: nowStr,
 		UpdatedAt: nowStr,
 	}
@@ -215,11 +215,11 @@ func (s *AuthService) RegisterToken(ctx context.Context, keyID, token, secret, n
 // saveTokenToDB 保存Token到数据库
 func (s *AuthService) saveTokenToDB(ctx context.Context, key *AuthKey) error {
 	row := authKeyRow{
-		KeyID:   key.KeyID,
-		Token:   key.Token,
-		Secret:  key.Secret,
-		Name:    &key.Name,
-		Enabled: key.Enabled,
+		KeyID:  key.KeyID,
+		Token:  key.Token,
+		Secret: key.Secret,
+		Name:   &key.Name,
+		State:  key.State,
 	}
 
 	// 先查询记录是否存在
@@ -236,7 +236,7 @@ func (s *AuthService) saveTokenToDB(ctx context.Context, key *AuthKey) error {
 				"token":      row.Token,
 				"secret":     row.Secret,
 				"name":       row.Name,
-				"enabled":    row.Enabled,
+				"state":      row.State,
 				"updated_at": gorm.Expr("NOW()"),
 			}).Error
 	}
@@ -285,7 +285,7 @@ func (s *AuthService) ListTokens(ctx context.Context) []*AuthKey {
 // listTokensFromDB 从数据库读取所有 Token
 func (s *AuthService) listTokensFromDB(ctx context.Context) []*AuthKey {
 	var rows []authKeyRow
-	result := s.db.WithContext(ctx).Table(s.tableName).Find(&rows)
+	result := s.db.WithContext(ctx).Table(s.tableName).Where("state = ?", 1).Find(&rows)
 	if result.Error != nil {
 		return nil
 	}
@@ -293,11 +293,11 @@ func (s *AuthService) listTokensFromDB(ctx context.Context) []*AuthKey {
 	var authKeys []*AuthKey
 	for _, r := range rows {
 		key := &AuthKey{
-			ID:      r.ID,
-			KeyID:   r.KeyID,
-			Token:   r.Token,
-			Secret:  r.Secret,
-			Enabled: r.Enabled,
+			ID:     r.ID,
+			KeyID:  r.KeyID,
+			Token:  r.Token,
+			Secret: r.Secret,
+			State:  r.State,
 		}
 		if r.Name != nil {
 			key.Name = *r.Name
@@ -340,7 +340,7 @@ func (s *AuthService) DeleteToken(ctx context.Context, token string) bool {
 	return true
 }
 
-// DisableToken 禁用 Token
+// DisableToken 禁用 Token（软删除）
 func (s *AuthService) DisableToken(ctx context.Context, token string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -349,7 +349,7 @@ func (s *AuthService) DisableToken(ctx context.Context, token string) bool {
 	if !ok {
 		return false
 	}
-	key.Enabled = false
+	key.State = 0
 	return true
 }
 
@@ -362,7 +362,7 @@ func (s *AuthService) EnableToken(ctx context.Context, token string) bool {
 	if !ok {
 		return false
 	}
-	key.Enabled = true
+	key.State = 1
 	return true
 }
 
@@ -403,7 +403,7 @@ func (s *AuthService) VerifySignature(token, timestamp, signature string) bool {
 	defer s.mu.RUnlock()
 
 	key, ok := s.authKeys[token]
-	if !ok || !key.Enabled {
+	if !ok || key.State != 1 {
 		return false
 	}
 

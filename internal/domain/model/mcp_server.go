@@ -14,7 +14,7 @@ type MCPServer struct {
 	AuthHeader     string    `json:"auth_header" gorm:"size:256"`
 	TimeoutSeconds int       `json:"timeout_seconds" gorm:"not null;default:30"`
 	ExtraHeaders   string    `json:"extra_headers" gorm:"type:text"`
-	Enabled        bool      `json:"enabled" gorm:"default:true;index"`
+	State          int       `json:"state" gorm:"default:1;comment:状态 1-正常 0-删除"`
 	CreatedAt      time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt      time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }
