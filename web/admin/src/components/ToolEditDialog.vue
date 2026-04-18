@@ -132,7 +132,7 @@
                     <div v-for="(param, index) in inputParams" :key="index"
                       :class="[
                         'flex items-center gap-2 rounded-xl p-3 border',
-                        hasInputMapping(param.name)
+                        getParamMapping(param)
                           ? 'bg-blue-50/50 border-blue-200'
                           : 'bg-white border-gray-200 hover:border-gray-300'
                       ]">
@@ -148,7 +148,7 @@
 
                       <!-- HTTP Schema Mapping Field - Highlighted -->
                       <div class="flex-shrink-0">
-                        <span v-if="getInputMapping(param.name)"
+                        <span v-if="getParamMapping(param)"
                           :class="[
                             'inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md',
                             'bg-green-100 text-green-700 border border-green-200'
@@ -156,7 +156,7 @@
                           <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor">
                             <path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                           </svg>
-                          <span class="font-mono">{{ getInputMapping(param.name).target }}</span>
+                          <span class="font-mono">{{ getParamMapping(param).target }}</span>
                         </span>
                         <span v-else :class="[
                           'inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-md',
@@ -417,6 +417,7 @@ const outputSchemaFields = ref([])
 const outputSchemaTree = ref([])
 const deletedInputFields = ref([])
 const toolNameTouched = ref(false)
+const prevNames = ref({})
 
 const DRAFT_CACHE_KEY = 'tool_edit_draft'
 const hasDraft = ref(false)
@@ -529,6 +530,16 @@ const getInputMapping = (fieldName) => {
   return inputMappings.value.find(m => m.source === fieldName)
 }
 
+// 计算当前 param 对应的映射（优先用 source 匹配，否则用 target 匹配）
+const getParamMapping = (param) => {
+  if (!param) return null
+  let mapping = inputMappings.value.find(m => m.source === param.name)
+  if (!mapping) {
+    mapping = inputMappings.value.find(m => m.target === (param.original_name || param.name))
+  }
+  return mapping
+}
+
 const getMappingTypeLabel = (mapping) => {
   if (!mapping.source_field) return ''
   const node = getNodeByPath(outputSchemaTree.value, mapping.source_field)
@@ -578,21 +589,29 @@ const resetForm = () => {
   outputSchemaFields.value = []
   outputSchemaTree.value = []
   deletedInputFields.value = []
+  prevNames.value = {}
 }
 
-const initForm = (tool) => {
+const initForm = async (tool) => {
   if (tool) {
     Object.assign(form, {
       name: tool.name,
       description: tool.description || '',
       service_id: tool.service_id || 0
     })
-    inputParams.value = tool.parameters ? [...tool.parameters] : []
-    inputMappings.value = tool.input_mapping ? [...tool.input_mapping] : []
-    outputMappings.value = tool.output_mapping ? [...tool.output_mapping] : []
+    inputParams.value = tool.parameters ? JSON.parse(JSON.stringify(tool.parameters)) : []
+    inputMappings.value = tool.input_mapping ? JSON.parse(JSON.stringify(tool.input_mapping)) : []
+    outputMappings.value = tool.output_mapping ? JSON.parse(JSON.stringify(tool.output_mapping)) : []
 
-    if (tool.service_id) {
-      loadServiceSchemas(tool.service_id)
+    prevNames.value = {}
+    inputMappings.value.forEach(m => {
+      if (m.target) {
+        prevNames.value[m.target] = m.source
+      }
+    })
+
+    if (form.service_id) {
+      await loadServiceSchemas(form.service_id)
     }
   } else {
     resetForm()
@@ -613,17 +632,21 @@ const loadServiceSchemas = async (serviceId) => {
 }
 
 // 监听入参字段名变化，同步更新入参映射
-watch(inputParams, (newParams, oldParams) => {
-  if (!oldParams) return
-  
-  newParams.forEach((param, index) => {
-    const oldParam = oldParams[index]
-    if (oldParam && oldParam.name !== param.name) {
-      // 字段名变化了，更新映射
-      const mappingIndex = inputMappings.value.findIndex(m => m.source === oldParam.name)
-      if (mappingIndex !== -1) {
-        inputMappings.value[mappingIndex].source = param.name
-      }
+watch(inputParams, (newParams) => {
+  const mappings = JSON.parse(JSON.stringify(inputMappings.value))
+
+  mappings.forEach(mapping => {
+    const param = newParams.find(p => p.original_name === mapping.target)
+    if (param && mapping.source !== param.name) {
+      mapping.source = param.name
+    }
+  })
+
+  inputMappings.value = mappings
+
+  newParams.forEach(param => {
+    if (param.original_name) {
+      prevNames.value[param.original_name] = param.name
     }
   })
 }, { deep: true })
@@ -682,7 +705,7 @@ const onServiceChange = async () => {
   }
 }
 
-const syncInputFromService = (service) => {
+const syncInputFromService = (service, preserveMappings = true) => {
   if (!service) return
   const schema = service.input_schema
 
@@ -696,23 +719,42 @@ const syncInputFromService = (service) => {
   }
 
   if (parsedSchema && parsedSchema.properties) {
-    const newParams = Object.entries(parsedSchema.properties).map(([name, prop]) => ({
-      name,
-      original_name: name, // 保存原始字段名
-      type: prop.type || 'string',
-      description: prop.description || '',
-      required: parsedSchema.required?.includes(name) || false,
-      schema_required: parsedSchema.required?.includes(name) || false
-    }))
+    const existingMappingsByTarget = new Map()
+    if (preserveMappings && inputMappings.value.length > 0) {
+      inputMappings.value.forEach(m => {
+        existingMappingsByTarget.set(m.target, m)
+      })
+    }
+
+    const newParams = Object.entries(parsedSchema.properties).map(([name, prop]) => {
+      const existingMapping = existingMappingsByTarget.get(name)
+      return {
+        name: existingMapping ? existingMapping.source : name,
+        original_name: name,
+        type: prop.type || 'string',
+        description: existingMapping ? existingMapping.description : (prop.description || ''),
+        required: parsedSchema.required?.includes(name) || false,
+        schema_required: parsedSchema.required?.includes(name) || false
+      }
+    })
+
+    const newMappings = newParams.map(p => {
+      const existing = existingMappingsByTarget.get(p.original_name)
+      return existing || {
+        source: p.name,
+        target: p.original_name,
+        description: ''
+      }
+    })
 
     inputParams.value = newParams
+    inputMappings.value = newMappings
 
-    // 自动为每个字段生成 1:1 映射
-    inputMappings.value = newParams.map(p => ({
-      source: p.name,
-      target: p.original_name, // target 使用原始字段名
-      description: ''
-    }))
+    newMappings.forEach(m => {
+      if (m.target) {
+        prevNames.value[m.target] = m.source
+      }
+    })
 
     inputSchemaFields.value = extractSchemaFields(parsedSchema)
     inputSchemaTree.value = schemaToTree(parsedSchema)

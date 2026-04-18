@@ -10,28 +10,29 @@ import (
 type Response struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`
+	Detail  string      `json:"detail,omitempty"`
 	Data    interface{} `json:"data,omitempty"`
 }
 
 const (
-	CodeSuccess           = 0
-	CodeBadRequest        = 400
-	CodeUnauthorized      = 401
-	CodeForbidden         = 403
-	CodeNotFound          = 404
-	CodeConflict          = 409
-	CodeInternalError     = 500
+	CodeSuccess            = 0
+	CodeBadRequest         = 400
+	CodeUnauthorized       = 401
+	CodeForbidden          = 403
+	CodeNotFound           = 404
+	CodeConflict           = 409
+	CodeInternalError      = 500
 	CodeServiceUnavailable = 503
 )
 
 var codeMessages = map[int]string{
-	CodeSuccess:           "success",
-	CodeBadRequest:        "bad request",
-	CodeUnauthorized:      "unauthorized",
-	CodeForbidden:         "forbidden",
-	CodeNotFound:          "not found",
-	CodeConflict:          "conflict",
-	CodeInternalError:     "internal server error",
+	CodeSuccess:            "success",
+	CodeBadRequest:         "bad request",
+	CodeUnauthorized:       "unauthorized",
+	CodeForbidden:          "forbidden",
+	CodeNotFound:           "not found",
+	CodeConflict:           "conflict",
+	CodeInternalError:      "internal server error",
 	CodeServiceUnavailable: "service unavailable",
 }
 
@@ -59,15 +60,20 @@ func Created(c *gin.Context, data interface{}) {
 	})
 }
 
-func Error(c *gin.Context, httpStatus int, code int, message string) {
+func Error(c *gin.Context, httpStatus int, code int, message string, detail ...string) {
+	errDetail := ""
+	if len(detail) > 0 {
+		errDetail = detail[0]
+	}
 	c.JSON(httpStatus, Response{
 		Code:    code,
 		Message: message,
+		Detail:  errDetail,
 	})
 }
 
-func BadRequest(c *gin.Context, message string) {
-	Error(c, http.StatusOK, CodeBadRequest, message)
+func BadRequest(c *gin.Context, message string, detail ...string) {
+	Error(c, http.StatusOK, CodeBadRequest, message, detail...)
 }
 
 func Unauthorized(c *gin.Context, message string) {

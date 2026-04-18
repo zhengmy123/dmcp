@@ -36,16 +36,16 @@ type ToolListResponse struct {
 }
 
 type ToolItemResponse struct {
-	ID            uint                         `json:"id"`
-	Name          string                       `json:"name"`
-	Description   string                       `json:"description"`
-	ServiceID     uint                         `json:"service_id"`
-	Parameters    []model.ParameterDefinition  `json:"parameters"`
-	InputMapping  []model.InputMappingField    `json:"input_mapping"`
-	OutputMapping []model.OutputMappingField   `json:"output_mapping"`
-	Enabled       bool                         `json:"enabled"`
-	CreatedAt     string                       `json:"created_at"`
-	UpdatedAt     string                       `json:"updated_at"`
+	ID            uint                        `json:"id"`
+	Name          string                      `json:"name"`
+	Description   string                      `json:"description"`
+	ServiceID     uint                        `json:"service_id"`
+	Parameters    []model.ParameterDefinition `json:"parameters"`
+	InputMapping  []model.InputMappingField   `json:"input_mapping"`
+	OutputMapping []model.OutputMappingField  `json:"output_mapping"`
+	Enabled       bool                        `json:"enabled"`
+	CreatedAt     string                      `json:"created_at"`
+	UpdatedAt     string                      `json:"updated_at"`
 }
 
 func (h *ToolHandler) ListTools(ctx *gin.Context) {
@@ -194,23 +194,32 @@ func (h *ToolHandler) GetTool(ctx *gin.Context) {
 }
 
 type CreateToolRequest struct {
-	Name          string `json:"name" binding:"required"`
-	Description   string `json:"description"`
-	ServiceID     uint   `json:"service_id"`
-	Parameters    []byte `json:"parameters"`
-	InputMapping  []byte `json:"input_mapping"`
-	OutputMapping []byte `json:"output_mapping"`
+	Name          string                     `json:"name" binding:"required"`
+	Description   string                     `json:"description"`
+	ServiceID     uint                       `json:"service_id" binding:"required"`
+	Parameters    []ToolParameterInput       `json:"parameters"`
+	InputMapping  []model.InputMappingField  `json:"input_mapping"`
+	OutputMapping []model.OutputMappingField `json:"output_mapping"`
+}
+
+type ToolParameterInput struct {
+	Name           string `json:"name"`
+	OriginalName   string `json:"original_name"`
+	Type           string `json:"type"`
+	Description    string `json:"description"`
+	Required       bool   `json:"required"`
+	SchemaRequired bool   `json:"schema_required"`
 }
 
 func (h *ToolHandler) CreateTool(ctx *gin.Context) {
 	var req CreateToolRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(ctx, "invalid request body: "+err.Error())
+		response.BadRequest(ctx, "invalid request body", err.Error())
 		return
 	}
 
 	if err := model.ValidateToolName(req.Name); err != nil {
-		response.BadRequest(ctx, "invalid tool name: "+err.Error())
+		response.BadRequest(ctx, "invalid tool name", err.Error())
 		return
 	}
 
@@ -222,14 +231,30 @@ func (h *ToolHandler) CreateTool(ctx *gin.Context) {
 		return
 	}
 
+	paramsBytes, err := sonic.Marshal(req.Parameters)
+	if err != nil {
+		response.BadRequest(ctx, "invalid parameters format")
+		return
+	}
+	inputMappingBytes, err := sonic.Marshal(req.InputMapping)
+	if err != nil {
+		response.BadRequest(ctx, "invalid input_mapping format")
+		return
+	}
+	outputMappingBytes, err := sonic.Marshal(req.OutputMapping)
+	if err != nil {
+		response.BadRequest(ctx, "invalid output_mapping format")
+		return
+	}
+
 	tool := model.ToolDefinition{
 		Name:          req.Name,
 		Description:   req.Description,
 		ServiceID:     req.ServiceID,
-		Parameters:    req.Parameters,
-		InputMapping:  req.InputMapping,
+		Parameters:    paramsBytes,
+		InputMapping:  inputMappingBytes,
 		Enabled:       true,
-		OutputMapping: req.OutputMapping,
+		OutputMapping: outputMappingBytes,
 	}
 
 	result := h.db.WithContext(ctx.Request.Context()).Create(&tool)
@@ -244,13 +269,13 @@ func (h *ToolHandler) CreateTool(ctx *gin.Context) {
 }
 
 type UpdateToolRequest struct {
-	Name          string `json:"name"`
-	Description   string `json:"description"`
-	ServiceID     *uint  `json:"service_id"`
-	Parameters    []byte `json:"parameters"`
-	InputMapping  []byte `json:"input_mapping"`
-	Enabled       *bool  `json:"enabled"`
-	OutputMapping []byte `json:"output_mapping"`
+	Name          string                     `json:"name"`
+	Description   string                     `json:"description"`
+	ServiceID     *uint                      `json:"service_id"`
+	Parameters    []ToolParameterInput       `json:"parameters"`
+	InputMapping  []model.InputMappingField  `json:"input_mapping"`
+	OutputMapping []model.OutputMappingField `json:"output_mapping"`
+	Enabled       *bool                      `json:"enabled"`
 }
 
 func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
@@ -277,13 +302,13 @@ func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
 
 	var req UpdateToolRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		response.BadRequest(ctx, "invalid request body: "+err.Error())
+		response.BadRequest(ctx, "invalid request body", err.Error())
 		return
 	}
 
 	if req.Name != "" {
 		if err := model.ValidateToolName(req.Name); err != nil {
-			response.BadRequest(ctx, "invalid tool name: "+err.Error())
+			response.BadRequest(ctx, "invalid tool name", err.Error())
 			return
 		}
 		var existing model.ToolDefinition
@@ -302,16 +327,31 @@ func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
 		tool.ServiceID = *req.ServiceID
 	}
 	if req.Parameters != nil {
-		tool.Parameters = req.Parameters
+		paramsBytes, err := sonic.Marshal(req.Parameters)
+		if err != nil {
+			response.BadRequest(ctx, "invalid parameters format")
+			return
+		}
+		tool.Parameters = paramsBytes
 	}
 	if req.InputMapping != nil {
-		tool.InputMapping = req.InputMapping
+		inputMappingBytes, err := sonic.Marshal(req.InputMapping)
+		if err != nil {
+			response.BadRequest(ctx, "invalid input_mapping format")
+			return
+		}
+		tool.InputMapping = inputMappingBytes
 	}
 	if req.Enabled != nil {
 		tool.Enabled = *req.Enabled
 	}
 	if req.OutputMapping != nil {
-		tool.OutputMapping = req.OutputMapping
+		outputMappingBytes, err := sonic.Marshal(req.OutputMapping)
+		if err != nil {
+			response.BadRequest(ctx, "invalid output_mapping format")
+			return
+		}
+		tool.OutputMapping = outputMappingBytes
 	}
 
 	result = h.db.WithContext(ctx.Request.Context()).Save(&tool)

@@ -62,9 +62,11 @@ type InputExtraConfig struct {
 
 // OutputMappingField 出参映射字段
 type OutputMappingField struct {
-	Source      string `json:"source"` // 源字段（来自HTTP服务OutputSchema）
-	Target      string `json:"target"` // 目标字段名（MCP工具返回）
-	Description string `json:"description,omitempty"`
+	SourceField  string `json:"source_field"` // 源字段（来自HTTP服务OutputSchema）
+	TargetField  string `json:"target_field"` // 目标字段名（MCP工具返回）
+	ValueType    string `json:"value_type"`
+	DefaultValue string `json:"default_value"`
+	Description  string `json:"description,omitempty"`
 }
 
 // InputMappingField 入参映射字段
