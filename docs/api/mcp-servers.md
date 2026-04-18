@@ -1,0 +1,141 @@
+# MCP Server 管理
+
+**需要认证**: 是（JWT）
+
+## 接口列表
+
+### GET /api/admin/mcp-servers
+
+获取 MCP Server 列表。
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "servers": [ ... ],
+    "count": 10
+  }
+}
+```
+
+### GET /api/admin/mcp-servers/:id
+
+获取单个 MCP Server 详情。
+
+**路径参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | uint | 是 | 服务器 ID |
+
+### POST /api/admin/mcp-servers
+
+创建 MCP Server。
+
+**请求体**:
+```json
+{
+  "type": "string",
+  "name": "string",
+  "description": "string",
+  "enabled": true,
+  "http_server_url": "string",
+  "auth_header": "string",
+  "timeout_seconds": 30,
+  "extra_headers": "string"
+}
+```
+
+**说明**: type 可以是 "local" 或 "http"
+
+### PUT /api/admin/mcp-servers/:id
+
+更新 MCP Server。
+
+**路径参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | uint | 是 | 服务器 ID |
+
+**请求体**: 同创建服务器
+
+**注意**: 服务器类型（type）创建后不能修改。
+
+### DELETE /api/admin/mcp-servers/:id
+
+删除 MCP Server。
+
+**路径参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | uint | 是 | 服务器 ID |
+
+### GET /api/admin/mcp-servers/:id/tools
+
+获取服务器绑定的工具列表。
+
+**路径参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | uint | 是 | 服务器 ID |
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "server_id": 1,
+    "vauth_key": "string",
+    "tools": [ ... ],
+    "count": 10
+  }
+}
+```
+
+### POST /api/admin/mcp-servers/:id/tools
+
+向服务器添加工具。
+
+**路径参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | uint | 是 | 服务器 ID |
+
+**请求体**:
+```json
+{
+  "tools": [ ... ]
+}
+```
+
+### DELETE /api/admin/mcp-servers/:id/tools/:toolName
+
+从服务器移除工具。
+
+**路径参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | uint | 是 | 服务器 ID |
+| toolName | string | 是 | 工具名称 |
+
+### POST /api/admin/mcp-servers/:id/tools/from-http-service
+
+从 HTTP 服务创建工具并绑定到服务器。
+
+**路径参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | uint | 是 | 服务器 ID |
+
+**请求体**:
+```json
+{
+  "name": "string",
+  "description": "string",
+  "service_id": 1,
+  "input_extra": [],
+  "output_mapping": []
+}
+```

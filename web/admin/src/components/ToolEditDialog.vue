@@ -279,7 +279,14 @@
                         class="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:border-blue-300 hover:bg-blue-50 transition-all shadow-sm"
                       >
                         <span class="text-sm font-mono text-gray-700">{{ node.path }}</span>
-                        <span class="px-2 py-0.5 text-xs rounded-md bg-gray-100 text-gray-600">
+                        <span :class="[
+                          'px-2 py-0.5 text-xs rounded-md',
+                          node.type === 'string' ? 'bg-blue-100 text-blue-700' : '',
+                          (node.type === 'integer' || node.type === 'number') ? 'bg-emerald-100 text-emerald-700' : '',
+                          node.type === 'boolean' ? 'bg-amber-100 text-amber-700' : '',
+                          (node.type === 'object' || node.type === 'array') ? 'bg-purple-100 text-purple-700' : '',
+                          !node.type ? 'bg-gray-100 text-gray-600' : ''
+                        ]">
                           {{ node.type }}
                         </span>
                       </button>
@@ -312,7 +319,10 @@
                             {{ node.path }}
                           </option>
                         </select>
-                        <span v-if="getMappingTypeLabel(mapping)" class="px-2 py-1 text-xs rounded-md bg-gray-100 text-gray-600 flex-shrink-0">
+                        <span v-if="getMappingTypeLabel(mapping)" :class="[
+                          'px-2 py-1 text-xs rounded-md flex-shrink-0',
+                          'bg-blue-100 text-blue-700 border border-blue-200'
+                        ]">
                           {{ getMappingTypeLabel(mapping) }}
                         </span>
                       </div>
