@@ -195,8 +195,10 @@
     <ToolEditDialog
       :visible="showToolDialog"
       :editing-tool="editingTool"
+      :save-error="saveError"
       @close="showToolDialog = false"
       @saved="handleToolSaved"
+      @error-cleared="saveError = ''"
     />
 
     <ToolBindingDialog
@@ -221,6 +223,7 @@ const editingTool = ref(null)
 const showBindingDialog = ref(false)
 const selectedToolForBinding = ref(null)
 const searchInput = ref('')
+const saveError = ref('')
 
 const totalPages = computed(() => {
   return Math.ceil(toolsStore.pagination.total / toolsStore.pagination.pageSize) || 1
@@ -282,11 +285,13 @@ const handlePageChange = (page) => {
 }
 
 const openCreateToolDialog = () => {
+  saveError.value = ''
   editingTool.value = null
   showToolDialog.value = true
 }
 
 const openEditToolDialog = (tool) => {
+  saveError.value = ''
   editingTool.value = { ...tool }
   showToolDialog.value = true
 }
@@ -298,6 +303,7 @@ const openBindingDialog = (tool) => {
 
 const handleToolSaved = async (data) => {
   let success = false
+  saveError.value = ''
   if (editingTool.value) {
     success = await toolsStore.updateTool(editingTool.value.id, data)
   } else {
@@ -307,6 +313,8 @@ const handleToolSaved = async (data) => {
   if (success) {
     localStorage.removeItem('tool_edit_draft')
     showToolDialog.value = false
+  } else {
+    saveError.value = toolsStore.error || '保存失败，请稍后重试'
   }
 }
 

@@ -28,6 +28,24 @@
                 <button @click="clearDraft" class="text-xs text-blue-500 hover:text-blue-700">清除草稿</button>
               </div>
 
+              <!-- Error message - prominent at top -->
+              <div v-if="saveError" class="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div class="flex items-start">
+                  <svg class="w-5 h-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                  </svg>
+                  <div class="flex-1">
+                    <p class="text-sm font-medium text-red-800">操作失败</p>
+                    <p class="text-sm text-red-600 mt-1">{{ saveError }}</p>
+                  </div>
+                  <button @click="$emit('error-cleared')" class="text-red-400 hover:text-red-600 ml-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
               <form @submit.prevent="handleSubmit" class="space-y-5">
                 <!-- Basic Info -->
                 <div class="space-y-4">
@@ -372,10 +390,14 @@ const props = defineProps({
   editingTool: {
     type: Object,
     default: null
+  },
+  saveError: {
+    type: String,
+    default: ''
   }
 })
 
-const emit = defineEmits(['close', 'saved'])
+const emit = defineEmits(['close', 'saved', 'error-cleared'])
 
 const servicesStore = useServicesStore()
 
