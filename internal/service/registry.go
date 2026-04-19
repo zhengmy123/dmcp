@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"dynamic_mcp_go_server/internal/common/logger"
+	"dynamic_mcp_go_server/internal/domain/model"
+	"dynamic_mcp_go_server/internal/domain/repository"
 	"dynamic_mcp_go_server/internal/infrastructure/store/tooldef"
 
 	"github.com/bytedance/sonic"
@@ -31,6 +33,8 @@ type DynamicRegistry struct {
 	lastHash      string
 	mu            sync.RWMutex
 	lastDefs      []tooldef.ToolDefinition
+	serverStore   repository.MCPServerStore
+	buildSvc      *ServerBuildService
 }
 
 func NewDynamicRegistry(s *server.MCPServer, store tooldef.Store, interval time.Duration, log logger.Logger, groupMCP *MCPGroupManager) *DynamicRegistry {
@@ -223,11 +227,49 @@ func (d *DynamicRegistry) GetDefinition(name string) (tooldef.ToolDefinition, bo
 
 // ListDefinitionsByVAuthKey 按 vauthKey 查询工具定义
 func (d *DynamicRegistry) ListDefinitionsByVAuthKey(vauthKey string) []tooldef.ToolDefinition {
-	return nil
+	if d.buildSvc == nil || d.serverStore == nil {
+		return nil
+	}
+
+	ctx := context.Background()
+	mcpServer, err := d.serverStore.GetByVAuthKey(ctx, vauthKey)
+	if err != nil || mcpServer == nil {
+		return nil
+	}
+
+	buildInfo, err := d.buildSvc.GetActiveBuild(ctx, mcpServer.ID)
+	if err != nil || buildInfo == nil {
+		return nil
+	}
+
+	var buildData model.BuildData
+	if err := sonic.Unmarshal([]byte(buildInfo.BuildData), &buildData); err != nil {
+		return nil
+	}
+
+	defs := make([]tooldef.ToolDefinition, 0, len(buildData.Tools))
+	for _, t := range buildData.Tools {
+		if t.Enabled {
+			defs = append(defs, tooldef.ToolDefinition{
+				ID:          t.ID,
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters:  t.Parameters,
+				Enabled:     t.Enabled,
+			})
+		}
+	}
+	return defs
 }
 
 // GetDefinitionByVAuthKey 按 vauthKey 和 toolName 查询工具定义
 func (d *DynamicRegistry) GetDefinitionByVAuthKey(vauthKey, name string) (tooldef.ToolDefinition, bool) {
+	defs := d.ListDefinitionsByVAuthKey(vauthKey)
+	for _, def := range defs {
+		if def.Name == name {
+			return def, true
+		}
+	}
 	return tooldef.ToolDefinition{}, false
 }
 
