@@ -9,7 +9,9 @@ import (
 	"dynamic_mcp_go_server/internal/common/logger"
 	"dynamic_mcp_go_server/internal/common/response"
 	"dynamic_mcp_go_server/internal/domain/model"
+	"dynamic_mcp_go_server/internal/domain/repository"
 	domainService "dynamic_mcp_go_server/internal/domain/service"
+	"dynamic_mcp_go_server/internal/infrastructure/database"
 	"dynamic_mcp_go_server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -28,11 +30,20 @@ type MCPServerHandler struct {
 	logger      logger.Logger
 }
 
-func NewMCPServerHandler(svc *service.MCPServerService, toolSvc *service.ToolService, db *gorm.DB, log logger.Logger) *MCPServerHandler {
+func NewMCPServerHandler(gormDB *gorm.DB, serviceStore repository.ServiceStore, log logger.Logger) *MCPServerHandler {
+	mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
+	toolStore := database.NewGORMToolStore(gormDB)
+	toolBindingDAO := database.NewGORMToolServerBindingDAO(gormDB)
+	serverBuildInfoDAO := database.NewGORMServerBuildInfoDAO(gormDB)
+
+	serverBuildService := service.NewServerBuildService(mcpServerDAO, toolStore, toolBindingDAO, serverBuildInfoDAO, serviceStore)
+	toolService := service.NewToolService(domainService.NewToolDomainService(toolStore, mcpServerDAO, serviceStore), serverBuildService)
+	mcpServerService := service.NewMCPServerService(mcpServerDAO, toolStore, toolBindingDAO)
+
 	return &MCPServerHandler{
-		service:     svc,
-		toolService: toolSvc,
-		db:          db,
+		service:     mcpServerService,
+		toolService: toolService,
+		db:          gormDB,
 		logger:      log,
 	}
 }

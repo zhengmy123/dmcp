@@ -18,7 +18,6 @@ import (
 	"dynamic_mcp_go_server/internal/config"
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
-	domainService "dynamic_mcp_go_server/internal/domain/service"
 	"dynamic_mcp_go_server/internal/infrastructure/auth"
 	"dynamic_mcp_go_server/internal/infrastructure/database"
 	"dynamic_mcp_go_server/internal/infrastructure/store/httpservice"
@@ -83,8 +82,6 @@ func main() {
 		go startServiceManagerSync(ctx, serviceStore, httpServiceManager, appLogger)
 	}
 
-	var mcpServerService *service.MCPServerService
-	var toolService *service.ToolService
 	var serverBuildService *service.ServerBuildService
 	var registry *service.DynamicRegistry
 	if gormDB != nil {
@@ -93,10 +90,6 @@ func main() {
 		toolServerBindingStore := database.NewGORMToolServerBindingDAO(gormDB)
 		serverBuildInfoDAO := database.NewGORMServerBuildInfoDAO(gormDB)
 		serverBuildService = service.NewServerBuildService(mcpServerDAO, toolStore, toolServerBindingStore, serverBuildInfoDAO, serviceStore)
-		mcpServerService = service.NewMCPServerService(mcpServerDAO, toolStore, toolServerBindingStore)
-
-		toolDomainService := domainService.NewToolDomainService(toolStore, mcpServerDAO, serviceStore)
-		toolService = service.NewToolService(toolDomainService, serverBuildService)
 
 		registry = service.NewDynamicRegistry(mcpServer, store, cfg.RefreshInterval(), appLogger, groupMCP, mcpServerDAO, serverBuildService)
 	} else {
@@ -116,7 +109,7 @@ func main() {
 		logger.String("tool_routes", "/mcp/{vauth_key}/{tool_name}"),
 	)
 
-	startHTTPServer(ctx, cfg, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, userService, jwtManager, appLogger, mcpServerService, toolService)
+	startHTTPServer(ctx, cfg, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, userService, jwtManager, appLogger)
 }
 
 func buildStore(cfg config.Config, log logger.Logger) (tooldef.Store, func(), error) {
@@ -337,8 +330,6 @@ func startHTTPServer(
 	userService *service.UserService,
 	jwtManager *auth.JWTManager,
 	log logger.Logger,
-	mcpServerService *service.MCPServerService,
-	toolService *service.ToolService,
 ) {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
@@ -351,7 +342,7 @@ func startHTTPServer(
 
 	engine.RedirectTrailingSlash = false
 
-	httpAPI.RegisterRoutes(engine, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, jwtManager, log, mcpServerService, toolService)
+	httpAPI.RegisterRoutes(engine, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, jwtManager, log)
 
 	if userService != nil && jwtManager != nil {
 		httpAPI.RegisterUserAuthRoutes(engine, userService, jwtManager)

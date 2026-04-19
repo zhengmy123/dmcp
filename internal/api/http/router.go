@@ -26,8 +26,6 @@ func RegisterRoutes(
 	gormDB *gorm.DB,
 	jwtManager *auth.JWTManager,
 	log logger.Logger,
-	mcpServerService *service.MCPServerService,
-	toolService *service.ToolService,
 ) {
 	metadataHandler := service.NewHTTPHandler(registry)
 	scopedMCPHandler := service.NewScopedMCPHandler(groupManager)
@@ -64,11 +62,11 @@ func RegisterRoutes(
 	}
 
 	// MCP Server 管理路由 (需要 JWT 认证)
-	if jwtManager != nil && mcpServerService != nil && toolService != nil {
+	if jwtManager != nil && gormDB != nil {
 		mcpGroup := e.Group("/api/admin")
 		mcpGroup.Use(apimw.JWTAuth(jwtManager))
 
-		mcpHandler := mcp.NewMCPServerHandler(mcpServerService, toolService, gormDB, log)
+		mcpHandler := mcp.NewMCPServerHandler(gormDB, serviceStore, log)
 		mcpGroup.GET("/mcp-servers", mcpHandler.ListServers)
 		mcpGroup.GET("/mcp-servers/:id", mcpHandler.GetServer)
 		mcpGroup.POST("/mcp-servers", mcpHandler.CreateServer)
