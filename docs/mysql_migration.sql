@@ -123,7 +123,25 @@ CREATE TABLE IF NOT EXISTS `tool_mcp_server_bindings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='工具与MCP Server绑定表';
 
 -- ============================================
--- 步骤6: 创建 users 表（用户表）
+-- 步骤6: 创建 server_build_info 表（MCP Server 构建信息表）
+-- ============================================
+CREATE TABLE IF NOT EXISTS `server_build_info` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `server_id` BIGINT UNSIGNED NOT NULL COMMENT '关联 mcp_servers.id',
+    `version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT '版本号',
+    `build_uuid` VARCHAR(36) NOT NULL COMMENT '构建UUID',
+    `hash` VARCHAR(64) NOT NULL COMMENT 'SHA256',
+    `build_data` TEXT COMMENT 'JSON: 工具和HTTP服务快照合并',
+    `state` INT NOT NULL DEFAULT 1 COMMENT '状态 1-有效 0-失效',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    UNIQUE KEY `uk_build_uuid` (`build_uuid`),
+    INDEX `idx_hash` (`hash`),
+    INDEX `idx_server_state` (`server_id`, `state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP Server 构建信息表';
+
+-- ============================================
+-- 步骤7: 创建 users 表（用户表）
 -- ============================================
 CREATE TABLE IF NOT EXISTS `users` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
