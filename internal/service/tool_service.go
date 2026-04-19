@@ -7,20 +7,30 @@ import (
 	domainService "dynamic_mcp_go_server/internal/domain/service"
 )
 
-// ToolService 工具应用服务
 type ToolService struct {
 	toolDomainService *domainService.ToolDomainService
+	buildSvc         *ServerBuildService
 }
 
 func NewToolService(
 	toolDomainService *domainService.ToolDomainService,
+	buildSvc *ServerBuildService,
 ) *ToolService {
 	return &ToolService{
 		toolDomainService: toolDomainService,
+		buildSvc:         buildSvc,
 	}
 }
 
-// CreateFromHTTPService 从 HTTPService 创建工具
 func (s *ToolService) CreateFromHTTPService(ctx context.Context, cmd domainService.CreateToolFromHTTPServiceCommand) (*model.ToolDefinition, error) {
-	return s.toolDomainService.CreateToolFromHTTPService(ctx, cmd)
+	tool, err := s.toolDomainService.CreateToolFromHTTPService(ctx, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.buildSvc != nil {
+		_ = s.buildSvc.BuildOrUpdate(ctx, cmd.ServerID)
+	}
+
+	return tool, nil
 }

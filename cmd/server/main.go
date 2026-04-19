@@ -48,7 +48,6 @@ func main() {
 	authService := service.NewAuthService(cfg.AdminToken)
 	jwtManager := auth.NewJWTManager(cfg.JWTSecret, time.Duration(cfg.JWTExpiration)*time.Hour)
 
-	// 用户服务和认证服务初始化（使用同一个 MySQL 连接）
 	gormDB, gormCleanup := initDatabase(cfg, appLogger, authService)
 	if gormCleanup != nil {
 		defer gormCleanup()
@@ -67,45 +66,47 @@ func main() {
 	)
 
 	groupMCP := service.NewMCPGroupManager(cfg.ServerName, cfg.ServerVersion, authService)
-	registry := service.NewDynamicRegistry(mcpServer, store, cfg.RefreshInterval(), appLogger, groupMCP)
 	httpServiceManager := service.NewHTTPServiceManager(appLogger)
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	if err := registry.SyncOnce(ctx); err != nil {
-		appLogger.Fatal("initial sync failed", logger.Error(err))
-	}
-	go registry.Start(ctx)
-
-	// 初始化HTTP服务存储
 	serviceStore, storeCleanup := buildServiceStore(appLogger)
 	if storeCleanup != nil {
 		defer storeCleanup()
 	}
 
-	// 首次同步：从数据库加载服务到内存
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
 	if serviceStore != nil {
 		if err := syncServicesFromStore(ctx, serviceStore, httpServiceManager, appLogger); err != nil {
 			appLogger.Error("initial HTTP service sync failed", logger.Error(err))
 		}
-		// 后台定期同步
 		go startServiceManagerSync(ctx, serviceStore, httpServiceManager, appLogger)
 	}
 
-	// 创建 MCP Server 相关的服务和领域服务
 	var mcpServerService *service.MCPServerService
 	var toolService *service.ToolService
+	var serverBuildService *service.ServerBuildService
+	var registry *service.DynamicRegistry
 	if gormDB != nil {
 		mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
 		toolStore := database.NewGORMToolStore(gormDB)
 		toolServerBindingStore := database.NewGORMToolServerBindingDAO(gormDB)
+		serverBuildInfoDAO := database.NewGORMServerBuildInfoDAO(gormDB)
+		serverBuildService = service.NewServerBuildService(mcpServerDAO, toolStore, toolServerBindingStore, serverBuildInfoDAO, serviceStore)
 		mcpServerService = service.NewMCPServerService(mcpServerDAO, toolStore, toolServerBindingStore)
 
-		// 创建领域服务和应用服务
 		toolDomainService := domainService.NewToolDomainService(toolStore, mcpServerDAO, serviceStore)
-		toolService = service.NewToolService(toolDomainService)
+		toolService = service.NewToolService(toolDomainService, serverBuildService)
+
+		registry = service.NewDynamicRegistry(mcpServer, store, cfg.RefreshInterval(), appLogger, groupMCP, mcpServerDAO, serverBuildService)
+	} else {
+		registry = service.NewDynamicRegistry(mcpServer, store, cfg.RefreshInterval(), appLogger, groupMCP, nil, nil)
 	}
+
+	if err := registry.SyncOnce(ctx); err != nil {
+		appLogger.Fatal("initial sync failed", logger.Error(err))
+	}
+	go registry.Start(ctx)
 
 	appLogger.Info("MCP server started",
 		logger.String("store", string(cfg.Store)),
@@ -138,7 +139,6 @@ func buildStore(cfg config.Config, log logger.Logger) (tooldef.Store, func(), er
 	}, nil
 }
 
-// initDatabase 初始化数据库和认证服务（复用同一个 MySQL 连接）
 func initDatabase(cfg config.Config, log logger.Logger, authService *service.AuthService) (*gorm.DB, func()) {
 	if cfg.MySQLDSN == "" {
 		log.Warn("MySQL DSN not configured")
@@ -163,7 +163,6 @@ func initDatabase(cfg config.Config, log logger.Logger, authService *service.Aut
 	}
 }
 
-// buildUserServiceWithDB 基于已有数据库连接创建用户服务
 func buildUserServiceWithDB(gormDB *gorm.DB, log logger.Logger) (*service.UserService, func()) {
 	if gormDB == nil {
 		return nil, nil
@@ -248,7 +247,6 @@ func sampleDefinitions() []tooldef.ToolDefinition {
 	}
 }
 
-// buildServiceStore 创建HTTP服务存储
 func buildServiceStore(log logger.Logger) (repository.ServiceStore, func()) {
 	storeCfg := config.LoadHTTPServiceStoreConfig()
 
@@ -309,14 +307,12 @@ func syncServicesFromStore(ctx context.Context, store repository.ServiceStore, m
 
 	currentServices := manager.ListServices()
 
-	// 新增或更新：数据库中存在的服务同步到内存
 	for _, svc := range services {
 		if err := manager.RegisterService(svc); err != nil {
 			log.Warn("register service failed", logger.Error(err), logger.Uint("service_id", svc.ID))
 		}
 	}
 
-	// 删除：内存中存在但数据库中不存在的服务，从内存移除
 	for _, svc := range currentServices {
 		if _, exists := storeServiceMap[svc.ID]; !exists {
 			if err := manager.DeleteService(svc.ID); err != nil {
@@ -347,7 +343,6 @@ func startHTTPServer(
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 
-	// 全局通用中间件链：Recovery -> RequestID -> Trace -> Cors -> Logger
 	engine.Use(commonmw.Recovery(log))
 	engine.Use(commonmw.RequestID())
 	engine.Use(commonmw.Trace(log))
@@ -385,5 +380,4 @@ func startHTTPServer(
 	}
 }
 
-// init 防止 json 包未使用编译错误
 var _ = json.Marshal

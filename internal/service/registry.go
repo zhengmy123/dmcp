@@ -37,7 +37,7 @@ type DynamicRegistry struct {
 	buildSvc      *ServerBuildService
 }
 
-func NewDynamicRegistry(s *server.MCPServer, store tooldef.Store, interval time.Duration, log logger.Logger, groupMCP *MCPGroupManager) *DynamicRegistry {
+func NewDynamicRegistry(s *server.MCPServer, store tooldef.Store, interval time.Duration, log logger.Logger, groupMCP *MCPGroupManager, serverStore repository.MCPServerStore, buildSvc *ServerBuildService) *DynamicRegistry {
 	serverName := "dynamic-mcp-go-server"
 	serverVersion := "2.0.0"
 
@@ -56,6 +56,8 @@ func NewDynamicRegistry(s *server.MCPServer, store tooldef.Store, interval time.
 		groupMCP:      groupMCP,
 		serverName:    serverName,
 		serverVersion: serverVersion,
+		serverStore:   serverStore,
+		buildSvc:      buildSvc,
 	}
 }
 
