@@ -15,16 +15,18 @@ import (
 )
 
 type ToolHandler struct {
-	db           *gorm.DB
-	serviceStore repository.ServiceStore
-	logger       logger.Logger
+	db            *gorm.DB
+	serviceStore  repository.ServiceStore
+	bindingStore  repository.ToolServerBindingStore
+	logger        logger.Logger
 }
 
-func NewToolHandler(db *gorm.DB, serviceStore repository.ServiceStore, log logger.Logger) *ToolHandler {
+func NewToolHandler(db *gorm.DB, serviceStore repository.ServiceStore, bindingStore repository.ToolServerBindingStore, log logger.Logger) *ToolHandler {
 	return &ToolHandler{
-		db:           db,
-		serviceStore: serviceStore,
-		logger:       log,
+		db:            db,
+		serviceStore:  serviceStore,
+		bindingStore:  bindingStore,
+		logger:        log,
 	}
 }
 
@@ -368,6 +370,16 @@ func (h *ToolHandler) DeleteTool(ctx *gin.Context) {
 	id, err := strconv.ParseUint(idParam, 10, 64)
 	if err != nil {
 		response.BadRequest(ctx, "invalid tool id")
+		return
+	}
+
+	bindings, err := h.bindingStore.ListByToolID(ctx.Request.Context(), uint(id))
+	if err != nil {
+		response.InternalError(ctx, err.Error())
+		return
+	}
+	if len(bindings) > 0 {
+		response.Conflict(ctx, "tool has active binding, unbind first")
 		return
 	}
 

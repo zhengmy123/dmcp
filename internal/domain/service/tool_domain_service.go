@@ -12,6 +12,7 @@ var (
 	ErrOnlyHTTPServiceServerCanHaveTools = errors.New("only http_service server can have tools")
 	ErrToolNameAlreadyExists             = errors.New("tool with same name already exists in this server")
 	ErrHTTPServiceNotFound               = errors.New("http service not found")
+	ErrToolHasActiveBinding             = errors.New("tool has active binding, unbind first")
 )
 
 type CreateToolFromHTTPServiceCommand struct {
