@@ -61,30 +61,6 @@ func NewDynamicRegistry(s *server.MCPServer, store tooldef.Store, interval time.
 	}
 }
 
-// SyncOnce 同步工具定义
-// TODO: 待重写实现 VAuthKey 关联查询逻辑
-//   - 通过 tool_mcp_server_bindings + mcp_servers 关联获取 VAuthKey
-//   - 支持批量查询 tool_ids 对应的 VAuthKey
-func (d *DynamicRegistry) SyncOnce(ctx context.Context) error {
-	return nil
-}
-
-func (d *DynamicRegistry) Start(ctx context.Context) {
-	ticker := time.NewTicker(d.interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			if err := d.SyncOnce(ctx); err != nil {
-				d.logger.Error("sync tool definitions failed", logger.Error(err))
-			}
-		}
-	}
-}
-
 func toServerTool(def tooldef.ToolDefinition) (server.ServerTool, error) {
 	params, err := parseToolParams(def.Parameters)
 	if err != nil {

@@ -26,18 +26,10 @@ func main() {
 	}
 	defer cleanup()
 
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer cancel()
-
-	if err := comp.Registry.SyncOnce(ctx); err != nil {
-		log.Fatalf("initial sync failed: %v", err)
-	}
-	go comp.Registry.Start(ctx)
-
-	startHTTPServer(ctx, cfg, comp)
+	startHTTPServer(cfg, comp)
 }
 
-func startHTTPServer(ctx context.Context, cfg config.Config, comp *ServerComponents) {
+func startHTTPServer(cfg config.Config, comp *ServerComponents) {
 	gin.SetMode(gin.ReleaseMode)
 	engine := gin.New()
 
@@ -67,14 +59,18 @@ func startHTTPServer(ctx context.Context, cfg config.Config, comp *ServerCompone
 
 	httpServer := &http.Server{Addr: cfg.HTTPAddr, Handler: engine}
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	go func() {
-		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		_ = httpServer.Shutdown(shutdownCtx)
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Printf("HTTP server error: %v", err)
+		}
 	}()
 
-	if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Printf("HTTP server error: %v", err)
-	}
+	<-ctx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = httpServer.Shutdown(shutdownCtx)
 }
