@@ -9,7 +9,6 @@ import (
 	"dynamic_mcp_go_server/internal/common/logger"
 	"dynamic_mcp_go_server/internal/domain/repository"
 	"dynamic_mcp_go_server/internal/infrastructure/auth"
-	"dynamic_mcp_go_server/internal/infrastructure/database"
 	"dynamic_mcp_go_server/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -81,7 +80,6 @@ func RegisterRoutes(
 		mcpGroup.DELETE("/mcp-servers/:id/tools/:toolName", mcpHandler.RemoveToolFromServer)
 		mcpGroup.POST("/mcp-servers/:id/tools/from-http-service", mcpHandler.CreateToolFromHTTPService)
 
-		toolStore := database.NewGORMToolStore(gormDB)
 		toolHandler := mcp.NewToolHandler(gormDB, serviceStore, log)
 		mcpGroup.GET("/tools", toolHandler.ListTools)
 		mcpGroup.GET("/tools/:id", toolHandler.GetTool)
@@ -91,13 +89,7 @@ func RegisterRoutes(
 
 		mcpGroup.GET("/http-services/:id/output-schema", toolHandler.GetHTTPServiceOutputSchema)
 
-		toolBindingDAO := database.NewGORMToolServerBindingDAO(gormDB)
-		mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
-		serverBuildInfoDAO := database.NewGORMServerBuildInfoDAO(gormDB)
-		serverBuildService := service.NewServerBuildService(mcpServerDAO, toolStore, toolBindingDAO, serverBuildInfoDAO, serviceStore)
-		toolBindingService := service.NewToolBindingService(toolBindingDAO, toolStore, mcpServerDAO, serverBuildService)
-		toolBindingHandler := mcp.NewToolBindingHandler(toolBindingService, log)
-
+		toolBindingHandler := mcp.NewToolBindingHandler(gormDB, serviceStore, log)
 		mcpGroup.GET("/tool-bindings/:toolId", toolBindingHandler.GetToolBindings)
 		mcpGroup.POST("/tool-bindings", toolBindingHandler.BindTool)
 		mcpGroup.DELETE("/tool-bindings/:toolId/:serverId", toolBindingHandler.UnbindTool)
