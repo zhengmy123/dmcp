@@ -12,7 +12,6 @@ import (
 	"dynamic_mcp_go_server/internal/service"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 // RegisterRoutes 注册所有路由
@@ -23,7 +22,10 @@ func RegisterRoutes(
 	authService *service.AuthService,
 	httpServiceManager *service.HTTPServiceManager,
 	serviceStore repository.ServiceStore,
-	gormDB *gorm.DB,
+	mcpServerStore repository.MCPServerStore,
+	toolStore repository.ToolStore,
+	toolBindingStore repository.ToolServerBindingStore,
+	serverBuildInfoStore repository.ServerBuildInfoStore,
 	jwtManager *auth.JWTManager,
 	log logger.Logger,
 ) {
@@ -62,11 +64,11 @@ func RegisterRoutes(
 	}
 
 	// MCP Server 管理路由 (需要 JWT 认证)
-	if jwtManager != nil && gormDB != nil {
+	if jwtManager != nil && mcpServerStore != nil {
 		mcpGroup := e.Group("/api/admin")
 		mcpGroup.Use(apimw.JWTAuth(jwtManager))
 
-		mcpHandler := mcp.NewMCPServerHandler(gormDB, serviceStore, log)
+		mcpHandler := mcp.NewMCPServerHandler(mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, serviceStore, log)
 		mcpGroup.GET("/mcp-servers", mcpHandler.ListServers)
 		mcpGroup.GET("/mcp-servers/:id", mcpHandler.GetServer)
 		mcpGroup.POST("/mcp-servers", mcpHandler.CreateServer)
@@ -78,7 +80,7 @@ func RegisterRoutes(
 		mcpGroup.DELETE("/mcp-servers/:id/tools/:toolName", mcpHandler.RemoveToolFromServer)
 		mcpGroup.POST("/mcp-servers/:id/tools/from-http-service", mcpHandler.CreateToolFromHTTPService)
 
-		toolHandler := mcp.NewToolHandler(gormDB, serviceStore, log)
+		toolHandler := mcp.NewToolHandler(toolStore, toolBindingStore, serviceStore, log)
 		mcpGroup.GET("/tools", toolHandler.ListTools)
 		mcpGroup.GET("/tools/:id", toolHandler.GetTool)
 		mcpGroup.POST("/tools", toolHandler.CreateTool)
@@ -87,7 +89,7 @@ func RegisterRoutes(
 
 		mcpGroup.GET("/http-services/:id/output-schema", toolHandler.GetHTTPServiceOutputSchema)
 
-		toolBindingHandler := mcp.NewToolBindingHandler(gormDB, serviceStore, log)
+		toolBindingHandler := mcp.NewToolBindingHandler(toolBindingStore, mcpServerStore, serverBuildInfoStore, serviceStore, log)
 		mcpGroup.GET("/tool-bindings/:toolId", toolBindingHandler.GetToolBindings)
 		mcpGroup.POST("/tool-bindings", toolBindingHandler.BindTool)
 		mcpGroup.DELETE("/tool-bindings/:toolId/:serverId", toolBindingHandler.UnbindTool)

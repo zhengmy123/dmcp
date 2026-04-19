@@ -84,14 +84,18 @@ func main() {
 
 	var serverBuildService *service.ServerBuildService
 	var registry *service.DynamicRegistry
+	var mcpServerStore repository.MCPServerStore
+	var toolStore repository.ToolStore
+	var toolBindingStore repository.ToolServerBindingStore
+	var serverBuildInfoStore repository.ServerBuildInfoStore
 	if gormDB != nil {
-		mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
-		toolStore := database.NewGORMToolStore(gormDB)
-		toolServerBindingStore := database.NewGORMToolServerBindingDAO(gormDB)
-		serverBuildInfoDAO := database.NewGORMServerBuildInfoDAO(gormDB)
-		serverBuildService = service.NewServerBuildService(mcpServerDAO, toolStore, toolServerBindingStore, serverBuildInfoDAO, serviceStore)
+		mcpServerStore = database.NewGORMMCPServerDAO(gormDB)
+		toolStore = database.NewGORMToolStore(gormDB)
+		toolBindingStore = database.NewGORMToolServerBindingDAO(gormDB)
+		serverBuildInfoStore = database.NewGORMServerBuildInfoDAO(gormDB)
+		serverBuildService = service.NewServerBuildService(mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, serviceStore)
 
-		registry = service.NewDynamicRegistry(mcpServer, store, cfg.RefreshInterval(), appLogger, groupMCP, mcpServerDAO, serverBuildService)
+		registry = service.NewDynamicRegistry(mcpServer, store, cfg.RefreshInterval(), appLogger, groupMCP, mcpServerStore, serverBuildService)
 	} else {
 		registry = service.NewDynamicRegistry(mcpServer, store, cfg.RefreshInterval(), appLogger, groupMCP, nil, nil)
 	}
@@ -109,7 +113,7 @@ func main() {
 		logger.String("tool_routes", "/mcp/{vauth_key}/{tool_name}"),
 	)
 
-	startHTTPServer(ctx, cfg, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, userService, jwtManager, appLogger)
+	startHTTPServer(ctx, cfg, registry, groupMCP, authService, httpServiceManager, serviceStore, mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, userService, jwtManager, appLogger)
 }
 
 func buildStore(cfg config.Config, log logger.Logger) (tooldef.Store, func(), error) {
@@ -326,7 +330,10 @@ func startHTTPServer(
 	authService *service.AuthService,
 	httpServiceManager *service.HTTPServiceManager,
 	serviceStore repository.ServiceStore,
-	gormDB *gorm.DB,
+	mcpServerStore repository.MCPServerStore,
+	toolStore repository.ToolStore,
+	toolBindingStore repository.ToolServerBindingStore,
+	serverBuildInfoStore repository.ServerBuildInfoStore,
 	userService *service.UserService,
 	jwtManager *auth.JWTManager,
 	log logger.Logger,
@@ -342,7 +349,7 @@ func startHTTPServer(
 
 	engine.RedirectTrailingSlash = false
 
-	httpAPI.RegisterRoutes(engine, registry, groupMCP, authService, httpServiceManager, serviceStore, gormDB, jwtManager, log)
+	httpAPI.RegisterRoutes(engine, registry, groupMCP, authService, httpServiceManager, serviceStore, mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, jwtManager, log)
 
 	if userService != nil && jwtManager != nil {
 		httpAPI.RegisterUserAuthRoutes(engine, userService, jwtManager)

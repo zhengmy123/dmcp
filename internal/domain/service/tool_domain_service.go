@@ -64,7 +64,7 @@ func (s *ToolDomainService) CreateToolFromHTTPService(ctx context.Context, cmd C
 		Enabled:       true,
 	}
 
-	if err := s.toolStore.Save(ctx, tool); err != nil {
+	if err := s.toolStore.Create(ctx, tool); err != nil {
 		return nil, err
 	}
 

@@ -6,11 +6,9 @@ import (
 	"dynamic_mcp_go_server/internal/common/logger"
 	"dynamic_mcp_go_server/internal/common/response"
 	"dynamic_mcp_go_server/internal/domain/repository"
-	"dynamic_mcp_go_server/internal/infrastructure/database"
 	"dynamic_mcp_go_server/internal/service"
 
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type ToolBindingHandler struct {
@@ -18,14 +16,15 @@ type ToolBindingHandler struct {
 	logger  logger.Logger
 }
 
-func NewToolBindingHandler(gormDB *gorm.DB, serviceStore repository.ServiceStore, log logger.Logger) *ToolBindingHandler {
-	mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
-	toolStore := database.NewGORMToolStore(gormDB)
-	toolBindingDAO := database.NewGORMToolServerBindingDAO(gormDB)
-	serverBuildInfoDAO := database.NewGORMServerBuildInfoDAO(gormDB)
-
-	serverBuildService := service.NewServerBuildService(mcpServerDAO, toolStore, toolBindingDAO, serverBuildInfoDAO, serviceStore)
-	svc := service.NewToolBindingService(toolBindingDAO, toolStore, mcpServerDAO, serverBuildService)
+func NewToolBindingHandler(
+	toolBindingStore repository.ToolServerBindingStore,
+	mcpServerStore repository.MCPServerStore,
+	serverBuildInfoStore repository.ServerBuildInfoStore,
+	serviceStore repository.ServiceStore,
+	log logger.Logger,
+) *ToolBindingHandler {
+	serverBuildService := service.NewServerBuildService(mcpServerStore, nil, toolBindingStore, serverBuildInfoStore, serviceStore)
+	svc := service.NewToolBindingService(toolBindingStore, nil, mcpServerStore, serverBuildService)
 
 	return &ToolBindingHandler{
 		service: svc,

@@ -8,26 +8,29 @@ import (
 	"dynamic_mcp_go_server/internal/common/response"
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
-	"dynamic_mcp_go_server/internal/infrastructure/database"
 
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 type ToolHandler struct {
-	db            *gorm.DB
-	serviceStore  repository.ServiceStore
-	bindingStore  repository.ToolServerBindingStore
-	logger        logger.Logger
+	toolStore    repository.ToolStore
+	bindingStore repository.ToolServerBindingStore
+	serviceStore repository.ServiceStore
+	logger       logger.Logger
 }
 
-func NewToolHandler(db *gorm.DB, serviceStore repository.ServiceStore, log logger.Logger) *ToolHandler {
+func NewToolHandler(
+	toolStore repository.ToolStore,
+	bindingStore repository.ToolServerBindingStore,
+	serviceStore repository.ServiceStore,
+	log logger.Logger,
+) *ToolHandler {
 	return &ToolHandler{
-		db:            db,
-		serviceStore:  serviceStore,
-		bindingStore:  database.NewGORMToolServerBindingDAO(db),
-		logger:        log,
+		toolStore:    toolStore,
+		bindingStore: bindingStore,
+		serviceStore: serviceStore,
+		logger:       log,
 	}
 }
 
@@ -62,22 +65,14 @@ func (h *ToolHandler) ListTools(ctx *gin.Context) {
 	if pageSize < 1 || pageSize > 100 {
 		pageSize = 20
 	}
-	offset := (page - 1) * pageSize
 
-	var total int64
-	var tools []model.ToolDefinition
-
-	query := h.db.WithContext(ctx.Request.Context()).Model(&model.ToolDefinition{})
-	if keyword != "" {
-		query = query.Where("name LIKE ?", "%"+keyword+"%")
+	query := &repository.ToolQuery{
+		Keyword: &keyword,
+		Enabled: func() *bool { v := true; return &v }(),
 	}
 
-	if err := query.Count(&total).Error; err != nil {
-		response.InternalError(ctx, err.Error())
-		return
-	}
-
-	if err := query.Offset(offset).Limit(pageSize).Order("id DESC").Find(&tools).Error; err != nil {
+	tools, total, err := h.toolStore.List(ctx.Request.Context(), query, page, pageSize)
+	if err != nil {
 		response.InternalError(ctx, err.Error())
 		return
 	}
@@ -162,17 +157,9 @@ func (h *ToolHandler) GetTool(ctx *gin.Context) {
 		return
 	}
 
-	var tool model.ToolDefinition
-	result := h.db.WithContext(ctx.Request.Context()).
-		Where("id = ?", id).
-		First(&tool)
-
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			response.NotFound(ctx, "tool not found")
-			return
-		}
-		response.InternalError(ctx, result.Error.Error())
+	tool, err := h.toolStore.GetByID(ctx.Request.Context(), uint(id))
+	if err != nil {
+		response.NotFound(ctx, "tool not found")
 		return
 	}
 
@@ -226,10 +213,8 @@ func (h *ToolHandler) CreateTool(ctx *gin.Context) {
 		return
 	}
 
-	var existing model.ToolDefinition
-	if err := h.db.WithContext(ctx.Request.Context()).
-		Where("name = ? AND enabled = ?", req.Name, true).
-		First(&existing).Error; err == nil {
+	existing, _ := h.toolStore.GetByName(ctx.Request.Context(), req.Name)
+	if existing != nil && existing.Enabled {
 		response.Conflict(ctx, fmt.Sprintf("tool with name %q already exists", req.Name))
 		return
 	}
@@ -250,7 +235,7 @@ func (h *ToolHandler) CreateTool(ctx *gin.Context) {
 		return
 	}
 
-	tool := model.ToolDefinition{
+	tool := &model.ToolDefinition{
 		Name:          req.Name,
 		Description:   req.Description,
 		ServiceID:     req.ServiceID,
@@ -260,9 +245,8 @@ func (h *ToolHandler) CreateTool(ctx *gin.Context) {
 		OutputMapping: outputMappingBytes,
 	}
 
-	result := h.db.WithContext(ctx.Request.Context()).Create(&tool)
-	if result.Error != nil {
-		response.InternalError(ctx, result.Error.Error())
+	if err := h.toolStore.Create(ctx.Request.Context(), tool); err != nil {
+		response.InternalError(ctx, err.Error())
 		return
 	}
 
@@ -289,17 +273,9 @@ func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
 		return
 	}
 
-	var tool model.ToolDefinition
-	result := h.db.WithContext(ctx.Request.Context()).
-		Where("id = ?", id).
-		First(&tool)
-
-	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			response.NotFound(ctx, "tool not found")
-			return
-		}
-		response.InternalError(ctx, result.Error.Error())
+	tool, err := h.toolStore.GetByID(ctx.Request.Context(), uint(id))
+	if err != nil {
+		response.NotFound(ctx, "tool not found")
 		return
 	}
 
@@ -314,10 +290,8 @@ func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
 			response.BadRequest(ctx, "invalid tool name", err.Error())
 			return
 		}
-		var existing model.ToolDefinition
-		if err := h.db.WithContext(ctx.Request.Context()).
-			Where("name = ? AND enabled = ? AND id != ?", req.Name, true, id).
-			First(&existing).Error; err == nil {
+		existing, _ := h.toolStore.GetByName(ctx.Request.Context(), req.Name)
+		if existing != nil && existing.ID != tool.ID && existing.Enabled {
 			response.Conflict(ctx, fmt.Sprintf("tool with name %q already exists", req.Name))
 			return
 		}
@@ -357,9 +331,8 @@ func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
 		tool.OutputMapping = outputMappingBytes
 	}
 
-	result = h.db.WithContext(ctx.Request.Context()).Save(&tool)
-	if result.Error != nil {
-		response.InternalError(ctx, result.Error.Error())
+	if err := h.toolStore.Update(ctx.Request.Context(), tool); err != nil {
+		response.InternalError(ctx, err.Error())
 		return
 	}
 
@@ -384,17 +357,8 @@ func (h *ToolHandler) DeleteTool(ctx *gin.Context) {
 		return
 	}
 
-	result := h.db.WithContext(ctx.Request.Context()).
-		Model(&model.ToolDefinition{}).
-		Where("id = ?", id).
-		Update("enabled", false)
-
-	if result.Error != nil {
-		response.InternalError(ctx, result.Error.Error())
-		return
-	}
-	if result.RowsAffected == 0 {
-		response.NotFound(ctx, "tool not found")
+	if err := h.toolStore.Delete(ctx.Request.Context(), uint(id)); err != nil {
+		response.InternalError(ctx, err.Error())
 		return
 	}
 

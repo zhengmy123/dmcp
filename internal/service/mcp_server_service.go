@@ -218,7 +218,7 @@ func (s *MCPServerService) AddToolsToServer(ctx context.Context, serverID uint, 
 
 	var toolIDs []uint
 	for _, name := range toolNames {
-		tools, err := s.toolStore.List(ctx)
+		tools, _, err := s.toolStore.List(ctx, nil, 1, 1000)
 		if err != nil {
 			continue
 		}

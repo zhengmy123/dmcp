@@ -11,12 +11,10 @@ import (
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
 	domainService "dynamic_mcp_go_server/internal/domain/service"
-	"dynamic_mcp_go_server/internal/infrastructure/database"
 	"dynamic_mcp_go_server/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 func generateVAuthKeyFromUUID() string {
@@ -26,24 +24,24 @@ func generateVAuthKeyFromUUID() string {
 type MCPServerHandler struct {
 	service     *service.MCPServerService
 	toolService *service.ToolService
-	db          *gorm.DB
 	logger      logger.Logger
 }
 
-func NewMCPServerHandler(gormDB *gorm.DB, serviceStore repository.ServiceStore, log logger.Logger) *MCPServerHandler {
-	mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
-	toolStore := database.NewGORMToolStore(gormDB)
-	toolBindingDAO := database.NewGORMToolServerBindingDAO(gormDB)
-	serverBuildInfoDAO := database.NewGORMServerBuildInfoDAO(gormDB)
-
-	serverBuildService := service.NewServerBuildService(mcpServerDAO, toolStore, toolBindingDAO, serverBuildInfoDAO, serviceStore)
-	toolService := service.NewToolService(domainService.NewToolDomainService(toolStore, mcpServerDAO, serviceStore), serverBuildService)
-	mcpServerService := service.NewMCPServerService(mcpServerDAO, toolStore, toolBindingDAO)
+func NewMCPServerHandler(
+	mcpServerStore repository.MCPServerStore,
+	toolStore repository.ToolStore,
+	toolBindingStore repository.ToolServerBindingStore,
+	serverBuildInfoStore repository.ServerBuildInfoStore,
+	serviceStore repository.ServiceStore,
+	log logger.Logger,
+) *MCPServerHandler {
+	serverBuildService := service.NewServerBuildService(mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, serviceStore)
+	toolService := service.NewToolService(domainService.NewToolDomainService(toolStore, mcpServerStore, serviceStore), serverBuildService)
+	mcpServerService := service.NewMCPServerService(mcpServerStore, toolStore, toolBindingStore)
 
 	return &MCPServerHandler{
 		service:     mcpServerService,
 		toolService: toolService,
-		db:          gormDB,
 		logger:      log,
 	}
 }
