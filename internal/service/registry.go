@@ -305,6 +305,11 @@ func (d *DynamicRegistry) ServerName() string {
 	return "dynamic-mcp-go-server"
 }
 
+// GetLogger 返回日志器
+func (d *DynamicRegistry) GetLogger() logger.Logger {
+	return d.logger
+}
+
 // ServerVersion 返回服务器版本
 func (d *DynamicRegistry) ServerVersion() string {
 	if d.serverVersion != "" {
