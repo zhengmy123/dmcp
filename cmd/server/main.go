@@ -124,17 +124,6 @@ func main() {
 	}
 	go comp.Registry.Start(ctx)
 
-	if comp.ServiceStore != nil {
-		go startServiceSync(ctx, comp.ServiceStore, comp.HTTPServiceMgr)
-	}
-
-	log.Println("MCP server started",
-		"store", cfg.Store,
-		"mode", "streamable_http",
-		"http_addr", cfg.HTTPAddr,
-		"mcp_endpoint", "/mcp/{vauth_key}",
-	)
-
 	startHTTPServer(ctx, cfg, comp)
 }
 
