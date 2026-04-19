@@ -19,17 +19,20 @@ type ToolBindingService struct {
 	bindingStore repository.ToolServerBindingStore
 	toolStore    repository.ToolStore
 	serverStore  repository.MCPServerStore
+	buildSvc     *ServerBuildService
 }
 
 func NewToolBindingService(
 	bindingStore repository.ToolServerBindingStore,
 	toolStore repository.ToolStore,
 	serverStore repository.MCPServerStore,
+	buildSvc *ServerBuildService,
 ) *ToolBindingService {
 	return &ToolBindingService{
 		bindingStore: bindingStore,
 		toolStore:    toolStore,
 		serverStore:  serverStore,
+		buildSvc:     buildSvc,
 	}
 }
 
@@ -77,6 +80,11 @@ func (s *ToolBindingService) BindTool(ctx context.Context, req BindToolRequest) 
 			return nil, fmt.Errorf("failed to restore binding: %w", err)
 		}
 		existingIncludeDeleted.State = 1
+
+		if s.buildSvc != nil {
+			_ = s.buildSvc.BuildOrUpdate(ctx, req.ServerID)
+		}
+
 		return existingIncludeDeleted, nil
 	}
 
@@ -87,6 +95,10 @@ func (s *ToolBindingService) BindTool(ctx context.Context, req BindToolRequest) 
 
 	if err := s.bindingStore.Save(ctx, binding); err != nil {
 		return nil, err
+	}
+
+	if s.buildSvc != nil {
+		_ = s.buildSvc.BuildOrUpdate(ctx, req.ServerID)
 	}
 
 	return binding, nil
@@ -154,6 +166,16 @@ func (s *ToolBindingService) BatchBindTools(ctx context.Context, req BatchBindRe
 	if len(toCreate) > 0 {
 		if err := s.bindingStore.BatchSave(ctx, toCreate); err != nil {
 			return 0, fmt.Errorf("failed to create bindings: %w", err)
+		}
+	}
+
+	affectedServers := make(map[uint]bool)
+	for _, serverID := range req.ServerIDs {
+		affectedServers[serverID] = true
+	}
+	for serverID := range affectedServers {
+		if s.buildSvc != nil {
+			_ = s.buildSvc.BuildOrUpdate(ctx, serverID)
 		}
 	}
 
