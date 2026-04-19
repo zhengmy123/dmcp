@@ -8,6 +8,7 @@ import (
 	"dynamic_mcp_go_server/internal/common/response"
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
+	"dynamic_mcp_go_server/internal/infrastructure/database"
 
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
@@ -21,11 +22,11 @@ type ToolHandler struct {
 	logger        logger.Logger
 }
 
-func NewToolHandler(db *gorm.DB, serviceStore repository.ServiceStore, bindingStore repository.ToolServerBindingStore, log logger.Logger) *ToolHandler {
+func NewToolHandler(db *gorm.DB, serviceStore repository.ServiceStore, log logger.Logger) *ToolHandler {
 	return &ToolHandler{
 		db:            db,
 		serviceStore:  serviceStore,
-		bindingStore:  bindingStore,
+		bindingStore:  database.NewGORMToolServerBindingDAO(db),
 		logger:        log,
 	}
 }

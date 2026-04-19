@@ -81,9 +81,8 @@ func RegisterRoutes(
 		mcpGroup.DELETE("/mcp-servers/:id/tools/:toolName", mcpHandler.RemoveToolFromServer)
 		mcpGroup.POST("/mcp-servers/:id/tools/from-http-service", mcpHandler.CreateToolFromHTTPService)
 
-		toolBindingDAO := database.NewGORMToolServerBindingDAO(gormDB)
 		toolStore := database.NewGORMToolStore(gormDB)
-		toolHandler := mcp.NewToolHandler(gormDB, serviceStore, toolBindingDAO, log)
+		toolHandler := mcp.NewToolHandler(gormDB, serviceStore, log)
 		mcpGroup.GET("/tools", toolHandler.ListTools)
 		mcpGroup.GET("/tools/:id", toolHandler.GetTool)
 		mcpGroup.POST("/tools", toolHandler.CreateTool)
@@ -92,6 +91,7 @@ func RegisterRoutes(
 
 		mcpGroup.GET("/http-services/:id/output-schema", toolHandler.GetHTTPServiceOutputSchema)
 
+		toolBindingDAO := database.NewGORMToolServerBindingDAO(gormDB)
 		mcpServerDAO := database.NewGORMMCPServerDAO(gormDB)
 		serverBuildInfoDAO := database.NewGORMServerBuildInfoDAO(gormDB)
 		serverBuildService := service.NewServerBuildService(mcpServerDAO, toolStore, toolBindingDAO, serverBuildInfoDAO, serviceStore)
