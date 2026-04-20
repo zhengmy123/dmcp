@@ -35,9 +35,9 @@ func NewMCPServerHandler(
 	serviceStore repository.ServiceStore,
 	log logger.Logger,
 ) *MCPServerHandler {
-	serverBuildService := service.NewServerBuildService(mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, serviceStore)
+	serverBuildService := service.NewServerBuildService(mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, serviceStore, nil)
 	toolService := service.NewToolService(domainService.NewToolDomainService(toolStore, mcpServerStore, serviceStore), serverBuildService)
-	mcpServerService := service.NewMCPServerService(mcpServerStore, toolStore, toolBindingStore)
+	mcpServerService := service.NewMCPServerService(mcpServerStore, serverBuildInfoStore, toolStore, toolBindingStore)
 
 	return &MCPServerHandler{
 		service:     mcpServerService,

@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
+	"dynamic_mcp_go_server/internal/common/cache"
 	"dynamic_mcp_go_server/internal/common/logger"
 	"dynamic_mcp_go_server/internal/config"
 	"dynamic_mcp_go_server/internal/domain/repository"
@@ -14,6 +16,7 @@ import (
 	"dynamic_mcp_go_server/internal/service"
 
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
 
@@ -45,7 +48,7 @@ func newServerComponents(cfg config.Config) (*ServerComponents, func(), error) {
 	cleanup := func() { loggerCleanup() }
 
 	comp.AuthService = service.NewAuthService(cfg.AdminToken)
-	comp.JWTManager = auth.NewJWTManager(cfg.JWTSecret, 0)
+	comp.JWTManager = auth.NewJWTManager(cfg.JWTSecret, time.Duration(cfg.JWTExpiration)*time.Hour)
 
 	if cfg.MySQLDSN != "" {
 		gormDB, err := database.NewGORMDB(cfg.MySQLDSN)
@@ -76,12 +79,44 @@ func newServerComponents(cfg config.Config) (*ServerComponents, func(), error) {
 
 	comp.HTTPServiceMgr = service.NewHTTPServiceManager(appLogger)
 	comp.MCPServer = server.NewMCPServer(cfg.ServerName, cfg.ServerVersion, server.WithToolCapabilities(true), server.WithRecovery())
-	comp.GroupMCP = service.NewMCPGroupManager(cfg.ServerName, cfg.ServerVersion, comp.AuthService)
+
+	var redisClient *redis.Client
+	if cfg.RedisAddr != "" {
+		redisClient = redis.NewClient(&redis.Options{
+			Addr:     cfg.RedisAddr,
+			Password: cfg.RedisPassword,
+			DB:       cfg.RedisDB,
+		})
+		if err := redisClient.Ping(context.Background()).Err(); err != nil {
+			appLogger.Warn("connect Redis failed", logger.Error(err))
+			redisClient = nil
+		} else {
+			appLogger.Info("Redis connected", logger.String("addr", cfg.RedisAddr))
+		}
+	}
+	buildInfoCache := service.NewBuildInfoCacheService(redisClient, 5*time.Minute)
+	mgrConfig := service.MCPGroupManagerConfig{
+		Cache: cache.Config{
+			L1Size:      2000,
+			L2Size:      2000,
+			L2Window:    time.Second,
+			L2Threshold: 2,
+		},
+		Redis: 5 * time.Minute,
+	}
+	comp.GroupMCP = service.NewMCPGroupManager(
+		cfg.ServerName, cfg.ServerVersion,
+		comp.AuthService,
+		buildInfoCache,
+		comp.BuildInfoStore,
+		comp.MCPServerStore,
+		mgrConfig,
+	)
 
 	if comp.MCPServerStore != nil {
 		comp.BuildService = service.NewServerBuildService(
 			comp.MCPServerStore, comp.ToolStore, comp.ToolBindingStore,
-			comp.BuildInfoStore, comp.ServiceStore,
+			comp.BuildInfoStore, comp.ServiceStore, buildInfoCache,
 		)
 		comp.Registry = service.NewDynamicRegistry(
 			comp.MCPServer, comp.ToolDefStore, cfg.RefreshInterval(),

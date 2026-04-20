@@ -23,7 +23,7 @@ func NewToolBindingHandler(
 	serviceStore repository.ServiceStore,
 	log logger.Logger,
 ) *ToolBindingHandler {
-	serverBuildService := service.NewServerBuildService(mcpServerStore, nil, toolBindingStore, serverBuildInfoStore, serviceStore)
+	serverBuildService := service.NewServerBuildService(mcpServerStore, nil, toolBindingStore, serverBuildInfoStore, serviceStore, nil)
 	svc := service.NewToolBindingService(toolBindingStore, nil, mcpServerStore, serverBuildService)
 
 	return &ToolBindingHandler{

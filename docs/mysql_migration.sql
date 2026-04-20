@@ -35,16 +35,19 @@ CREATE TABLE IF NOT EXISTS `mcp_auth_keys` (
 -- ============================================
 CREATE TABLE IF NOT EXISTS `mcp_servers` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-    `vauth_key` VARCHAR(128) NOT NULL COMMENT '认证密钥',
+    `v_auth_key` VARCHAR(128) NOT NULL COMMENT '认证密钥',
     `name` VARCHAR(128) NOT NULL COMMENT '服务名称',
     `description` VARCHAR(512) DEFAULT '' COMMENT '服务描述',
-    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
+    `type` VARCHAR(32) NOT NULL DEFAULT 'http_service' COMMENT '服务类型',
+    `http_server_url` VARCHAR(512) DEFAULT '' COMMENT 'HTTP服务URL',
+    `auth_header` VARCHAR(256) DEFAULT '' COMMENT '认证Header',
+    `timeout_seconds` INT NOT NULL DEFAULT 30 COMMENT '超时秒数',
+    `extra_headers` TEXT COMMENT '额外Headers',
     `state` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态 1-正常 0-删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_vauth_key` (`vauth_key`),
-    INDEX `idx_enabled` (`enabled`),
+    UNIQUE KEY `uk_v_auth_key` (`v_auth_key`),
     INDEX `idx_created_at` (`created_at`),
     INDEX `idx_updated_at` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP服务表';
@@ -135,6 +138,7 @@ CREATE TABLE IF NOT EXISTS `server_build_info` (
     `state` INT NOT NULL DEFAULT 1 COMMENT '状态 1-有效 0-失效',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+		PRIMARY KEY (`id`),
     UNIQUE KEY `uk_build_uuid` (`build_uuid`),
     INDEX `idx_hash` (`hash`),
     INDEX `idx_server_state` (`server_id`, `state`)

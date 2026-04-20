@@ -8,6 +8,7 @@ import (
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -20,6 +21,7 @@ var (
 // MCPServerService 提供 MCPServer 的业务逻辑
 type MCPServerService struct {
 	serverStore        repository.MCPServerStore
+	buildInfoStore     repository.ServerBuildInfoStore
 	toolStore          repository.ToolStore
 	toolServerBindingStore repository.ToolServerBindingStore
 }
@@ -27,11 +29,13 @@ type MCPServerService struct {
 // NewMCPServerService 创建 MCPServerService
 func NewMCPServerService(
 	serverStore repository.MCPServerStore,
+	buildInfoStore repository.ServerBuildInfoStore,
 	toolStore repository.ToolStore,
 	toolServerBindingStore repository.ToolServerBindingStore,
 ) *MCPServerService {
 	return &MCPServerService{
 		serverStore:        serverStore,
+		buildInfoStore:     buildInfoStore,
 		toolStore:          toolStore,
 		toolServerBindingStore: toolServerBindingStore,
 	}
@@ -76,7 +80,27 @@ func (s *MCPServerService) CreateServer(ctx context.Context, server *model.MCPSe
 		return ErrMCPServerExists
 	}
 
-	return s.serverStore.Save(ctx, server)
+	// 保存 server
+	if err := s.serverStore.Save(ctx, server); err != nil {
+		return err
+	}
+
+	// 创建空的 server_build_info（确保即使没有绑定工具也能返回有效的 build_info）
+	if s.buildInfoStore != nil {
+		emptyBuildInfo := &model.ServerBuildInfo{
+			ServerID:  server.ID,
+			Version:   1,
+			BuildUUID: uuid.New().String(),
+			Hash:      "",
+			BuildData: `{"tools":[],"http_services":[]}`,
+			State:     1,
+		}
+		if err := s.buildInfoStore.Save(ctx, emptyBuildInfo); err != nil {
+			return fmt.Errorf("failed to create build info: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // UpdateServer 更新 MCPServer

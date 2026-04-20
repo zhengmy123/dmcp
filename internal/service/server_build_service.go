@@ -20,6 +20,7 @@ type ServerBuildService struct {
 	bindingStore   repository.ToolServerBindingStore
 	buildInfoStore repository.ServerBuildInfoStore
 	serviceStore   repository.ServiceStore
+	buildInfoCache *BuildInfoCacheService
 }
 
 func NewServerBuildService(
@@ -28,6 +29,7 @@ func NewServerBuildService(
 	bindingStore repository.ToolServerBindingStore,
 	buildInfoStore repository.ServerBuildInfoStore,
 	serviceStore repository.ServiceStore,
+	buildInfoCache *BuildInfoCacheService,
 ) *ServerBuildService {
 	return &ServerBuildService{
 		serverStore:    serverStore,
@@ -35,6 +37,7 @@ func NewServerBuildService(
 		bindingStore:   bindingStore,
 		buildInfoStore: buildInfoStore,
 		serviceStore:   serviceStore,
+		buildInfoCache: buildInfoCache,
 	}
 }
 
@@ -127,6 +130,13 @@ func (s *ServerBuildService) BuildOrUpdate(ctx context.Context, serverID uint) e
 
 	if err := s.buildInfoStore.Save(ctx, newBuild); err != nil {
 		return fmt.Errorf("failed to save new build: %w", err)
+	}
+
+	if s.buildInfoCache != nil {
+		server, err := s.serverStore.GetByID(ctx, serverID)
+		if err == nil && server != nil {
+			_ = s.buildInfoCache.DeleteBuildUUID(ctx, server.VAuthKey)
+		}
 	}
 
 	return nil

@@ -18,8 +18,8 @@ func NewScopedMCPHandler(manager *MCPGroupManager) http.Handler {
 			return
 		}
 
-		h, ok := manager.Handler(groupKey)
-		if !ok {
+		h, err := manager.GetHandler(groupKey)
+		if err != nil {
 			writeJSON(w, http.StatusNotFound, map[string]any{
 				"error":     "mcp server not found",
 				"vauth_key": groupKey,

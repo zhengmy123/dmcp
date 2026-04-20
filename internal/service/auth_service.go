@@ -106,7 +106,7 @@ func (s *AuthService) loadTokensFromDB() error {
 	}
 
 	var rows []authKeyRow
-	result := s.db.Table(s.tableName).Where("state = ?", 1).Find(&rows)
+	result := s.db.Table(s.tableName).Where("state >= ?", 0).Find(&rows)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -285,7 +285,7 @@ func (s *AuthService) ListTokens(ctx context.Context) []*AuthKey {
 // listTokensFromDB 从数据库读取所有 Token
 func (s *AuthService) listTokensFromDB(ctx context.Context) []*AuthKey {
 	var rows []authKeyRow
-	result := s.db.WithContext(ctx).Table(s.tableName).Where("state = ?", 1).Find(&rows)
+	result := s.db.WithContext(ctx).Table(s.tableName).Where("state >= ?", 0).Find(&rows)
 	if result.Error != nil {
 		return nil
 	}
@@ -350,6 +350,13 @@ func (s *AuthService) DisableToken(ctx context.Context, token string) bool {
 		return false
 	}
 	key.State = 0
+
+	if s.db != nil {
+		s.db.WithContext(ctx).Table(s.tableName).Where("id = ?", key.ID).Updates(map[string]interface{}{
+			"state":      0,
+			"updated_at": gorm.Expr("NOW()"),
+		})
+	}
 	return true
 }
 
@@ -363,6 +370,13 @@ func (s *AuthService) EnableToken(ctx context.Context, token string) bool {
 		return false
 	}
 	key.State = 1
+
+	if s.db != nil {
+		s.db.WithContext(ctx).Table(s.tableName).Where("id = ?", key.ID).Updates(map[string]interface{}{
+			"state":      1,
+			"updated_at": gorm.Expr("NOW()"),
+		})
+	}
 	return true
 }
 

@@ -128,7 +128,7 @@ func (d *GORMMCPServerDAO) GetByID(ctx context.Context, id uint) (*model.MCPServ
 func (d *GORMMCPServerDAO) GetByVAuthKey(ctx context.Context, vauthKey string) (*model.MCPServer, error) {
 	var server model.MCPServer
 
-	result := d.db.WithContext(ctx).Where("vauth_key = ? AND state = ?", vauthKey, 1).First(&server)
+	result := d.db.WithContext(ctx).Where("v_auth_key = ? AND state = ?", vauthKey, 1).First(&server)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("mcp server not found")

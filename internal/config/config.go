@@ -21,6 +21,9 @@ type Config struct {
 	HTTPAddr       string
 	MySQLDSN       string
 	MySQLTable     string
+	RedisAddr      string
+	RedisPassword  string
+	RedisDB        int
 
 	// 认证配置
 	AdminToken    string // 后台管理 API Token (旧版兼容)
@@ -37,9 +40,12 @@ func Load() Config {
 		HTTPAddr:       loadHTTPAddr(),
 		MySQLDSN:       getenv("MYSQL_DSN", "root:1234qwer@tcp(127.0.0.1:3306)/mcp_server?charset=utf8mb4&parseTime=True&loc=Local"),
 		MySQLTable:     getenv("MYSQL_TABLE", "mcp_tool_definitions"),
+		RedisAddr:      getenv("REDIS_ADDR", "127.0.0.1:6379"),
+		RedisPassword:  getenv("REDIS_PASSWORD", ""),
+		RedisDB:        getenvInt("REDIS_DB", 0),
 		AdminToken:     getenv("ADMIN_TOKEN", "admin-secret-token"),
 		JWTSecret:      getenv("JWT_SECRET", "mcp-server-jwt-secret-key-change-in-production"),
-		JWTExpiration:  getenvInt("JWT_EXPIRATION", 24), // 默认24小时
+		JWTExpiration:  getenvInt("JWT_EXPIRATION", 168),
 	}
 }
 
