@@ -44,5 +44,10 @@ export const mcpServerAPI = {
   // 从 Server 移除工具
   removeTool(id, toolName) {
     return request.delete(`/api/admin/mcp-servers/${id}/tools/${toolName}`)
+  },
+
+  // 同步构建信息
+  syncBuild(id) {
+    return request.post(`/api/admin/mcp-servers/${id}/sync-build`)
   }
 }

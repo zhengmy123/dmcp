@@ -81,6 +81,7 @@ func RegisterRoutes(
 		mcpGroup.POST("/mcp-servers/:id/tools", mcpHandler.AddToolsToServer)
 		mcpGroup.DELETE("/mcp-servers/:id/tools/:toolName", mcpHandler.RemoveToolFromServer)
 		mcpGroup.POST("/mcp-servers/:id/tools/from-http-service", mcpHandler.CreateToolFromHTTPService)
+		mcpGroup.POST("/mcp-servers/:id/sync-build", mcpHandler.SyncBuild)
 
 		toolHandler := mcp.NewToolHandler(toolStore, toolBindingStore, serviceStore, log)
 		mcpGroup.GET("/tools", toolHandler.ListTools)

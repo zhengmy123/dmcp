@@ -145,6 +145,14 @@
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
               <div class="flex items-center justify-end space-x-2">
                 <button
+                  v-if="server.state === 1"
+                  @click="handleSyncBuild(server)"
+                  class="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-green-100 text-green-700 hover:bg-green-200"
+                  title="同步构建信息"
+                >
+                  同步构建
+                </button>
+                <button
                   @click="openBindingDialog(server)"
                   class="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-blue-100 text-blue-700 hover:bg-blue-200"
                   title="管理工具"
@@ -436,6 +444,22 @@ const handleRestore = async (server) => {
     await mcpServersStore.restoreServer(server.id)
   } catch (e) {
     console.error('启用失败:', e)
+  }
+}
+
+const handleSyncBuild = async (server) => {
+  const confirmed = await confirmDialog.value.show({
+    title: '同步构建',
+    message: `确定要同步 Server "${server.name}" 的构建信息吗？\n\n如果工具或 HTTP 服务有变更，将生成新的构建版本。`,
+    type: 'info',
+    confirmText: '同步',
+    cancelText: '取消'
+  })
+  if (!confirmed) return
+  try {
+    await mcpServersStore.syncBuild(server.id)
+  } catch (e) {
+    console.error('同步构建失败:', e)
   }
 }
 

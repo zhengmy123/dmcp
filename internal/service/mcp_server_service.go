@@ -26,6 +26,7 @@ type MCPServerService struct {
 	buildInfoStore         repository.ServerBuildInfoStore
 	toolStore              repository.ToolStore
 	toolServerBindingStore repository.ToolServerBindingStore
+	serverBuildService     *ServerBuildService
 }
 
 // NewMCPServerService 创建 MCPServerService
@@ -34,12 +35,14 @@ func NewMCPServerService(
 	buildInfoStore repository.ServerBuildInfoStore,
 	toolStore repository.ToolStore,
 	toolServerBindingStore repository.ToolServerBindingStore,
+	serverBuildService *ServerBuildService,
 ) *MCPServerService {
 	return &MCPServerService{
 		serverStore:            serverStore,
 		buildInfoStore:         buildInfoStore,
 		toolStore:              toolStore,
 		toolServerBindingStore: toolServerBindingStore,
+		serverBuildService:     serverBuildService,
 	}
 }
 
@@ -289,4 +292,11 @@ func (s *MCPServerService) AddToolsToServer(ctx context.Context, serverID uint, 
 // RemoveToolFromServer 从 Server 移除工具
 func (s *MCPServerService) RemoveToolFromServer(ctx context.Context, serverID uint, toolName string) error {
 	return s.RemoveToolFromServerByName(ctx, serverID, toolName)
+}
+
+func (s *MCPServerService) SyncBuild(ctx context.Context, serverID uint) error {
+	if s.serverBuildService == nil {
+		return fmt.Errorf("server build service is not available")
+	}
+	return s.serverBuildService.BuildOrUpdate(ctx, serverID)
 }

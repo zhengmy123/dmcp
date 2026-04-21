@@ -151,6 +151,22 @@ export const useMCPServersStore = defineStore('mcpServers', () => {
     }
   }
 
+  // 同步构建信息
+  const syncBuild = async (id) => {
+    loading.value = true
+    error.value = null
+    try {
+      const result = await mcpServerAPI.syncBuild(id)
+      await fetchServers()
+      return result
+    } catch (e) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     servers,
     currentServer,
@@ -163,6 +179,7 @@ export const useMCPServersStore = defineStore('mcpServers', () => {
     deleteServer,
     restoreServer,
     addToolsToServer,
-    removeToolFromServer
+    removeToolFromServer,
+    syncBuild
   }
 })

@@ -37,7 +37,7 @@ func NewMCPServerHandler(
 ) *MCPServerHandler {
 	serverBuildService := service.NewServerBuildService(mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, serviceStore, nil)
 	toolService := service.NewToolService(domainService.NewToolDomainService(toolStore, mcpServerStore, serviceStore), serverBuildService)
-	mcpServerService := service.NewMCPServerService(mcpServerStore, serverBuildInfoStore, toolStore, toolBindingStore)
+	mcpServerService := service.NewMCPServerService(mcpServerStore, serverBuildInfoStore, toolStore, toolBindingStore, serverBuildService)
 
 	return &MCPServerHandler{
 		service:     mcpServerService,
@@ -450,5 +450,28 @@ func (h *MCPServerHandler) CreateToolFromHTTPService(ctx *gin.Context) {
 
 	response.Created(ctx, gin.H{
 		"tool": tool,
+	})
+}
+
+func (h *MCPServerHandler) SyncBuild(ctx *gin.Context) {
+	idParam := ctx.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		response.BadRequest(ctx, "invalid server id")
+		return
+	}
+
+	if err := h.service.SyncBuild(ctx.Request.Context(), uint(id)); err != nil {
+		switch err {
+		case service.ErrMCPServerNotFound:
+			response.NotFound(ctx, "mcp server not found")
+		default:
+			response.InternalError(ctx, err.Error())
+		}
+		return
+	}
+
+	response.Success(ctx, gin.H{
+		"server_id": id,
 	})
 }
