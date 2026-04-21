@@ -40,7 +40,18 @@
             @keyup.enter="handleSearch"
           >
         </div>
-        <div class="w-40">
+        <div class="w-32">
+          <select
+            v-model="searchForm.type"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            @change="handleSearch"
+          >
+            <option value="">全部类型</option>
+            <option value="http_service">HTTP Service</option>
+            <option value="proxy">Proxy</option>
+          </select>
+        </div>
+        <div class="w-32">
           <select
             v-model="searchForm.state"
             class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
@@ -84,20 +95,19 @@
     </div>
 
     <!-- Servers Table -->
-    <div v-else class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div v-else class="bg-white rounded-xl border border-gray-200">
       <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称</th>
+            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">类型</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VAuth Key</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">工具数</th>
             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">描述</th>
             <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
           </tr>
         </thead>
         <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="server in mcpServersStore.servers" :key="server.id" class="hover:bg-gray-50">
+          <tr v-for="server in mcpServersStore.servers" :key="server.id" class="hover:bg-gray-50 group">
             <td class="px-6 py-4 whitespace-nowrap">
               <div class="flex items-center">
                 <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center mr-3">
@@ -106,7 +116,28 @@
                   </svg>
                 </div>
                 <span class="font-medium text-gray-900">{{ server.name }}</span>
+                <div class="relative ml-2">
+                  <span class="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">
+                    ({{ server.tool_count || 0 }} 工具)
+                  </span>
+                  <div class="absolute left-0 top-6 w-64 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-10 hidden group-hover:block">
+                    <div class="text-sm text-gray-700">
+                      <div class="font-medium mb-1">工具数量: {{ server.tool_count || 0 }}</div>
+                      <div v-if="server.description" class="text-gray-500 text-xs mt-2 pt-2 border-t border-gray-100">
+                        {{ server.description }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+              <span v-if="server.type === 'proxy'" class="px-2.5 py-1 text-xs font-medium bg-purple-100 text-purple-700 rounded-full">
+                Proxy
+              </span>
+              <span v-else class="px-2.5 py-1 text-xs font-medium bg-green-100 text-green-700 rounded-full">
+                HTTP Service
+              </span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <div class="flex items-center">
@@ -127,20 +158,12 @@
               </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-              <span class="px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
-                {{ server.tool_count || 0 }} 个工具
-              </span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap">
               <span
                 class="px-2.5 py-1 text-xs font-medium rounded-full"
                 :class="server.state === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
               >
                 {{ server.state === 1 ? '正常' : '已删除' }}
               </span>
-            </td>
-            <td class="px-6 py-4">
-              <span class="text-sm text-gray-500 line-clamp-1">{{ server.description || '无描述' }}</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
               <div class="flex items-center justify-end space-x-2">
@@ -195,13 +218,50 @@
       </table>
     </div>
 
+    <!-- Pagination -->
+    <div v-if="mcpServersStore.pagination.total > 0" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+      <div class="text-sm text-gray-500">
+        共 <span class="font-medium">{{ mcpServersStore.pagination.total }}</span> 条记录，第
+        <span class="font-medium">{{ mcpServersStore.pagination.page }}</span> /
+        <span class="font-medium">{{ totalPages }}</span> 页
+      </div>
+      <div class="flex items-center space-x-2">
+        <button
+          @click="goToPage(mcpServersStore.pagination.page - 1)"
+          :disabled="mcpServersStore.pagination.page <= 1"
+          class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+        >
+          上一页
+        </button>
+        <div class="flex items-center space-x-1">
+          <button
+            v-for="page in visiblePages"
+            :key="page"
+            @click="page !== '...' && goToPage(page)"
+            class="w-8 h-8 text-sm rounded-lg transition-colors"
+            :class="page === mcpServersStore.pagination.page
+              ? 'bg-primary-600 text-white'
+              : 'border border-gray-300 hover:bg-gray-50'"
+            :disabled="page === '...'"
+          >
+            {{ page }}
+          </button>
+        </div>
+        <button
+          @click="goToPage(mcpServersStore.pagination.page + 1)"
+          :disabled="mcpServersStore.pagination.page >= totalPages"
+          class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+        >
+          下一页
+        </button>
+      </div>
+    </div>
+
     <!-- Create/Edit Modal -->
-    <teleport to="body">
-      <transition name="fade">
-        <div v-if="showModal" class="fixed inset-0 z-50 overflow-y-auto">
-          <div class="flex items-center justify-center min-h-screen px-4">
-            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showModal = false"></div>
-            <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden fade-in">
+    <div v-if="showModal" class="fixed inset-0 z-50 overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen px-4">
+        <div class="fixed inset-0 bg-black bg-opacity-50" @click="showModal = false"></div>
+        <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
               <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
                 <h3 class="text-lg font-semibold text-gray-900">{{ editingServer ? '编辑 Server' : '创建 Server' }}</h3>
                 <button @click="showModal = false" class="text-gray-400 hover:text-gray-600">
@@ -252,11 +312,40 @@
                   </div>
 
                   <div v-if="form.type === 'proxy'">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">认证 Header</label>
-                    <input v-model="form.auth_header" type="text"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="Authorization: Bearer xxx">
-                    <p class="text-xs text-gray-400 mt-1">可选，代理认证信息</p>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">请求 Headers</label>
+
+                    <div class="space-y-2">
+                      <div v-for="(header, index) in headersList" :key="index" class="flex items-center gap-2">
+                        <input v-model="header.key" type="text" placeholder="Header Name"
+                          class="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-sm">
+                        <span class="text-gray-400">:</span>
+                        <input v-model="header.value" type="text" placeholder="Header Value"
+                          class="flex-1 px-2 py-1 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 focus:border-primary-500 text-sm">
+                        <button type="button" @click="removeHeader(index)"
+                          class="p-1 text-red-500 hover:text-red-700">
+                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="mt-2 flex items-center gap-2">
+                      <button type="button" @click="openBulkHeadersModal"
+                        class="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                        </svg>
+                        批量粘贴
+                      </button>
+                      <button type="button" @click="addHeader"
+                        class="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        添加
+                      </button>
+                    </div>
                   </div>
 
                   <div v-if="form.type === 'proxy'">
@@ -265,14 +354,6 @@
                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       placeholder="30">
                     <p class="text-xs text-gray-400 mt-1">请求超时时间，默认 30 秒</p>
-                  </div>
-
-                  <div v-if="form.type === 'proxy'">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">额外 Headers</label>
-                    <textarea v-model="form.extra_headers" rows="2"
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      placeholder="X-Custom-Header: value"></textarea>
-                    <p class="text-xs text-gray-400 mt-1">可选，JSON 格式额外请求头</p>
                   </div>
 
                   <div class="flex justify-end space-x-3 pt-4">
@@ -286,6 +367,41 @@
                     </button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        </div>
+
+    <!-- Bulk Headers Modal -->
+    <teleport to="body">
+      <transition name="modal">
+        <div v-if="showBulkHeadersModal" class="fixed inset-0 z-50 overflow-y-auto">
+          <div class="flex items-center justify-center min-h-screen px-4">
+            <div class="fixed inset-0 bg-black bg-opacity-50" @click="showBulkHeadersModal = false"></div>
+            <div class="relative bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+              <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium text-gray-900">批量粘贴 Headers</h3>
+                <button @click="showBulkHeadersModal = false" class="text-gray-400 hover:text-gray-600">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </div>
+
+              <p class="text-sm text-gray-500 mb-2">每行一个 Header，格式：Key: Value</p>
+              <textarea v-model="headersBulkText" rows="8"
+                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm font-mono"
+                placeholder="Authorization: Bearer xxx&#10;X-Mcp-Token: xxx&#10;X-Custom-Header: value"></textarea>
+
+              <div class="flex justify-end space-x-3 mt-4">
+                <button type="button" @click="showBulkHeadersModal = false"
+                  class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50">
+                  取消
+                </button>
+                <button type="button" @click="applyBulkHeaders"
+                  class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700">
+                  应用
+                </button>
               </div>
             </div>
           </div>
@@ -306,7 +422,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useMCPServersStore } from '@/stores/mcpServers'
 import ServerBindingDialog from '@/components/ServerBindingDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
@@ -334,20 +450,82 @@ const copyVAuthKey = async (text, id) => {
 
 const searchForm = reactive({
   name: '',
-  state: ''
+  state: '',
+  type: ''
 })
 
 const handleSearch = () => {
   mcpServersStore.fetchServers({
     name: searchForm.name,
-    state: searchForm.state === '' ? undefined : parseInt(searchForm.state)
+    state: searchForm.state === '' ? undefined : parseInt(searchForm.state),
+    type: searchForm.type || undefined,
+    page: 1,
+    page_size: mcpServersStore.pagination.pageSize
   })
 }
 
 const handleReset = () => {
   searchForm.name = ''
   searchForm.state = ''
-  mcpServersStore.fetchServers({})
+  searchForm.type = ''
+  mcpServersStore.fetchServers({
+    page: 1,
+    page_size: mcpServersStore.pagination.pageSize
+  })
+}
+
+const handlePageSizeChange = () => {
+  mcpServersStore.fetchServers({
+    name: searchForm.name,
+    state: searchForm.state === '' ? undefined : parseInt(searchForm.state),
+    type: searchForm.type || undefined,
+    page: 1,
+    page_size: mcpServersStore.pagination.pageSize
+  })
+}
+
+const totalPages = computed(() => {
+  const total = mcpServersStore.pagination.total
+  const size = mcpServersStore.pagination.pageSize
+  return Math.ceil(total / size) || 1
+})
+
+const visiblePages = computed(() => {
+  const current = mcpServersStore.pagination.page
+  const total = totalPages.value
+  const pages = []
+
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i)
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 3) {
+      pages.push(1)
+      pages.push('...')
+      for (let i = total - 4; i <= total; i++) pages.push(i)
+    } else {
+      pages.push(1)
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) pages.push(i)
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+  return pages
+})
+
+const goToPage = (page) => {
+  mcpServersStore.fetchServers({
+    name: searchForm.name,
+    state: searchForm.state === '' ? undefined : parseInt(searchForm.state),
+    type: searchForm.type || undefined,
+    page: page
+  })
 }
 
 const form = reactive({
@@ -356,10 +534,62 @@ const form = reactive({
   vauth_key: '',
   description: '',
   http_server_url: '',
-  auth_header: '',
-  timeout_seconds: 30,
-  extra_headers: ''
+  headers: '',
+  timeout_seconds: 30
 })
+
+const headersList = reactive([
+  { key: '', value: '' }
+])
+const headersBulkText = ref('')
+const showBulkHeadersModal = ref(false)
+
+const openBulkHeadersModal = () => {
+  headersBulkText.value = form.headers || ''
+  showBulkHeadersModal.value = true
+}
+
+const applyBulkHeaders = () => {
+  const lines = headersBulkText.value.split('\n').filter(l => l.trim())
+  headersList.length = 0
+  for (const line of lines) {
+    const idx = line.indexOf(':')
+    if (idx > 0) {
+      headersList.push({
+        key: line.substring(0, idx).trim(),
+        value: line.substring(idx + 1).trim()
+      })
+    }
+  }
+  if (headersList.length === 0) {
+    headersList.push({ key: '', value: '' })
+  }
+  updateFormHeaders()
+  showBulkHeadersModal.value = false
+}
+
+const updateFormHeaders = () => {
+  form.headers = headersList
+    .filter(h => h.key.trim() !== '')
+    .map(h => `${h.key}: ${h.value}`)
+    .join('\n')
+}
+
+const addHeader = () => {
+  headersList.push({ key: '', value: '' })
+}
+
+const removeHeader = (index) => {
+  headersList.splice(index, 1)
+  if (headersList.length === 0) {
+    headersList.push({ key: '', value: '' })
+  }
+  updateFormHeaders()
+}
+
+watch(headersList, () => {
+  updateFormHeaders()
+}, { deep: true })
 
 const openBindingDialog = (server) => {
   selectedServerForBinding.value = server
@@ -378,30 +608,51 @@ const openCreateModal = () => {
     vauth_key: '',
     description: '',
     http_server_url: '',
-    auth_header: '',
-    timeout_seconds: 30,
-    extra_headers: ''
+    headers: '',
+    timeout_seconds: 30
   })
+  headersList.length = 0
+  headersList.push({ key: '', value: '' })
+  headersBulkText.value = ''
   showModal.value = true
 }
 
 const openEditModal = (server) => {
   editingServer.value = server
+
+  headersList.length = 0
+  if (server.headers) {
+    const lines = server.headers.split('\n').filter(l => l.trim())
+    for (const line of lines) {
+      const idx = line.indexOf(':')
+      if (idx > 0) {
+        headersList.push({
+          key: line.substring(0, idx).trim(),
+          value: line.substring(idx + 1).trim()
+        })
+      }
+    }
+  }
+  if (headersList.length === 0) {
+    headersList.push({ key: '', value: '' })
+  }
+  headersBulkText.value = server.headers || ''
+
   Object.assign(form, {
     name: server.name,
     type: server.type || 'http_service',
     vauth_key: server.vauth_key,
     description: server.description || '',
     http_server_url: server.http_server_url || '',
-    auth_header: server.auth_header || '',
-    timeout_seconds: server.timeout_seconds || 30,
-    extra_headers: server.extra_headers || ''
+    headers: server.headers || '',
+    timeout_seconds: server.timeout_seconds || 30
   })
   showModal.value = true
 }
 
 const handleSubmit = async () => {
   try {
+    updateFormHeaders()
     if (editingServer.value) {
       const { type, vauth_key, ...updateData } = form
       await mcpServersStore.updateServer(editingServer.value.id, updateData)
@@ -464,6 +715,9 @@ const handleSyncBuild = async (server) => {
 }
 
 onMounted(() => {
-  mcpServersStore.fetchServers()
+  mcpServersStore.fetchServers({
+    page: 1,
+    page_size: 10
+  })
 })
 </script>

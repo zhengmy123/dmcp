@@ -252,7 +252,6 @@ CREATE TABLE mcp_auth_keys (
     secret      VARCHAR(256) NOT NULL,     -- 密钥
     name        VARCHAR(128),              -- 名称/描述
     enabled     TINYINT(1) DEFAULT 1,       -- 启用状态
-    last_used_at DATETIME,                 -- 最后使用时间
     expires_at  DATETIME,                  -- 过期时间
     created_at  DATETIME,
     updated_at  DATETIME,

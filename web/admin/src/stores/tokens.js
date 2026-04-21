@@ -9,15 +9,20 @@ export const useTokenStore = defineStore('tokens', () => {
 
   const pagination = ref({
     page: 1,
-    pageSize: 20,
+    pageSize: 10,
     total: 0
   })
 
-  const fetchTokens = async () => {
+  const fetchTokens = async (params = {}) => {
     loading.value = true
     error.value = null
     try {
-      const res = await authApi.getTokens()
+      const queryParams = {
+        page: params.page || pagination.value.page,
+        page_size: params.pageSize || pagination.value.pageSize,
+        ...params
+      }
+      const res = await authApi.getTokens(queryParams)
       const data = res.data || res
       const items = data.items || data.tokens || []
       tokens.value = items.map(item => ({
@@ -107,6 +112,7 @@ export const useTokenStore = defineStore('tokens', () => {
     tokens,
     loading,
     error,
+    pagination,
     fetchTokens,
     createToken,
     deleteToken,

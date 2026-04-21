@@ -24,6 +24,7 @@ type ServerComponents struct {
 	MCPServer        *server.MCPServer
 	Registry         *service.DynamicRegistry
 	GroupMCP         *service.MCPGroupManager
+	ProxyHandler     *service.ProxyHandler
 	AuthService      *service.AuthService
 	JWTManager       *auth.JWTManager
 	UserService      *service.UserService
@@ -98,6 +99,12 @@ func newServerComponents(cfg config.Config) (*ServerComponents, func(), error) {
 		}
 	}
 	buildInfoCache := service.NewBuildInfoCacheService(redisClient, 5*time.Minute)
+	proxyCache := service.NewProxyServerCacheService(redisClient, 5*time.Minute)
+
+	if comp.MCPServerStore != nil {
+		comp.ProxyHandler = service.NewProxyHandler(comp.MCPServerStore, proxyCache, appLogger)
+	}
+
 	mgrConfig := service.MCPGroupManagerConfig{
 		Cache: cache.Config{
 			L1Size:      2000,

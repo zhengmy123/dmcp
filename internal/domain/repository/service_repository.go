@@ -8,6 +8,7 @@ import (
 
 // ServiceStore 定义HTTP服务存储接口
 type ServiceStore interface {
+	ListWithQuery(ctx context.Context, query *model.ServiceQuery) ([]*model.HTTPService, int64, error)
 	List(ctx context.Context) ([]*model.HTTPService, error)
 	Get(ctx context.Context, id uint) (*model.HTTPService, error)
 	Save(ctx context.Context, service *model.HTTPService) error

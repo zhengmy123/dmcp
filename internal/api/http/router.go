@@ -20,6 +20,7 @@ func RegisterRoutes(
 	e *gin.Engine,
 	registry *service.DynamicRegistry,
 	groupManager *service.MCPGroupManager,
+	proxyHandler *service.ProxyHandler,
 	authService *service.AuthService,
 	httpServiceManager *service.HTTPServiceManager,
 	serviceStore repository.ServiceStore,
@@ -32,7 +33,7 @@ func RegisterRoutes(
 	gormDB interface{},
 ) {
 	metadataHandler := service.NewHTTPHandler(registry)
-	scopedMCPHandler := service.NewScopedMCPHandler(groupManager)
+	scopedMCPHandler := service.NewScopedMCPHandler(groupManager, proxyHandler)
 
 	meta := gin.WrapH(metadataHandler)
 
@@ -70,7 +71,7 @@ func RegisterRoutes(
 		mcpGroup := e.Group("/api/admin")
 		mcpGroup.Use(apimw.JWTAuth(jwtManager))
 
-		mcpHandler := mcp.NewMCPServerHandler(mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, serviceStore, log)
+		mcpHandler := mcp.NewMCPServerHandler(mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, serviceStore, proxyHandler, log)
 		mcpGroup.GET("/mcp-servers", mcpHandler.ListServers)
 		mcpGroup.GET("/mcp-servers/:id", mcpHandler.GetServer)
 		mcpGroup.POST("/mcp-servers", mcpHandler.CreateServer)

@@ -13,6 +13,7 @@ type MCPServerQuery struct {
 	PageSize int
 	Name     string
 	State    *int
+	Type     string
 }
 
 type MCPServerWithToolCount struct {

@@ -100,7 +100,8 @@ restart-web:
 
 restart-app:
 	@echo "重启应用服务（Go + Web）..."
-	docker-compose restart mcp-server web
+	$(MAKE) restart-web
+	$(MAKE) restart-server
 	@echo "应用服务已重启！"
 
 logs:

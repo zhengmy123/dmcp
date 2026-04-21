@@ -17,7 +17,43 @@
       </button>
     </div>
 
-    <!-- Services Grid -->
+    <!-- Search Filters -->
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+      <div class="flex flex-wrap gap-4">
+        <div class="flex-1 min-w-[200px]">
+          <input
+            v-model="searchForm.name"
+            type="text"
+            placeholder="搜索名称..."
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            @keyup.enter="handleSearch"
+          >
+        </div>
+        <div class="w-32">
+          <select
+            v-model="searchForm.state"
+            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+            @change="handleSearch"
+          >
+            <option value="">全部状态</option>
+            <option :value="1">正常</option>
+            <option :value="0">已删除</option>
+          </select>
+        </div>
+        <button
+          @click="handleSearch"
+          class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700"
+        >
+          搜索
+        </button>
+        <button
+          @click="handleReset"
+          class="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+        >
+          重置
+        </button>
+      </div>
+    </div>
     <div v-if="servicesStore.loading" class="text-center py-12">
       <div class="loading-spinner mx-auto"></div>
       <p class="text-gray-500 mt-2">加载中...</p>
@@ -89,6 +125,70 @@
           <button @click="openDebugModal(service)"
             class="px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
             调试
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="servicesStore.pagination.total > 0" class="flex items-center justify-between px-4 py-3 bg-white rounded-xl border border-gray-200">
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-500">每页</span>
+        <select
+          v-model.number="pageSize"
+          @change="handlePageSizeChange"
+          class="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+        >
+          <option :value="10">10</option>
+          <option :value="20">20</option>
+          <option :value="50">50</option>
+        </select>
+        <span class="text-sm text-gray-500">条</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-sm text-gray-500">
+          共 {{ servicesStore.pagination.total }} 条，第 {{ servicesStore.pagination.page }} / {{ totalPages }} 页
+        </span>
+        <div class="flex items-center gap-1">
+          <button
+            @click="goToPage(1)"
+            :disabled="servicesStore.pagination.page <= 1"
+            class="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            title="首页"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+            </svg>
+          </button>
+          <button
+            @click="goToPage(servicesStore.pagination.page - 1)"
+            :disabled="servicesStore.pagination.page <= 1"
+            class="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            title="上一页"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+          </button>
+          <button
+            @click="goToPage(servicesStore.pagination.page + 1)"
+            :disabled="servicesStore.pagination.page >= totalPages"
+            class="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            title="下一页"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </button>
+          <button
+            @click="goToPage(totalPages)"
+            :disabled="servicesStore.pagination.page >= totalPages"
+            class="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            title="末页"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+            </svg>
           </button>
         </div>
       </div>
@@ -688,6 +788,56 @@ import {
 
 const servicesStore = useServicesStore()
 const showToast = inject('showToast')
+
+// Search and pagination state
+const searchForm = reactive({
+  name: '',
+  state: ''
+})
+const pageSize = ref(10)
+
+const handleSearch = () => {
+  servicesStore.fetchServices({
+    name: searchForm.name || undefined,
+    state: searchForm.state === '' ? undefined : parseInt(searchForm.state),
+    page: 1,
+    pageSize: pageSize.value
+  })
+}
+
+const handleReset = () => {
+  searchForm.name = ''
+  searchForm.state = ''
+  pageSize.value = 10
+  servicesStore.fetchServices({
+    page: 1,
+    pageSize: pageSize.value
+  })
+}
+
+const handlePageSizeChange = () => {
+  servicesStore.fetchServices({
+    name: searchForm.name || undefined,
+    state: searchForm.state === '' ? undefined : parseInt(searchForm.state),
+    page: 1,
+    pageSize: pageSize.value
+  })
+}
+
+const goToPage = (page) => {
+  servicesStore.fetchServices({
+    name: searchForm.name || undefined,
+    state: searchForm.state === '' ? undefined : parseInt(searchForm.state),
+    page: page,
+    pageSize: pageSize.value
+  })
+}
+
+const totalPages = computed(() => {
+  const total = servicesStore.pagination.total
+  const size = pageSize.value
+  return Math.ceil(total / size)
+})
 
 // Service form modal state
 const showModal = ref(false)
@@ -1398,7 +1548,10 @@ const formatRequestBody = () => {
 }
 
 onMounted(() => {
-  servicesStore.fetchServices()
+  servicesStore.fetchServices({
+    page: 1,
+    pageSize: pageSize.value
+  })
 })
 </script>
 

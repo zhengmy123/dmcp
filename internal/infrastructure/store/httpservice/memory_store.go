@@ -3,6 +3,7 @@ package httpservice
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"dynamic_mcp_go_server/internal/common/logger"
@@ -24,6 +25,53 @@ func NewMemoryServiceStore(log logger.Logger) *MemoryServiceStore {
 		services: make(map[uint]*model.HTTPService),
 		logger:   log,
 	}
+}
+
+func (s *MemoryServiceStore) ListWithQuery(ctx context.Context, query *model.ServiceQuery) ([]*model.HTTPService, int64, error) {
+	services := make([]*model.HTTPService, 0)
+	for _, service := range s.services {
+		// 名称筛选
+		if query.Name != nil && *query.Name != "" {
+			if !contains(service.Name, *query.Name) {
+				continue
+			}
+		}
+		// 状态筛选
+		if query.State != nil {
+			if service.State != *query.State {
+				continue
+			}
+		}
+		services = append(services, service)
+	}
+
+	// 统计总数
+	total := int64(len(services))
+
+	// 分页
+	page := query.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := query.PageSize
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	start := (page - 1) * pageSize
+	end := start + pageSize
+	if start >= len(services) {
+		return []*model.HTTPService{}, total, nil
+	}
+	if end > len(services) {
+		end = len(services)
+	}
+
+	return services[start:end], total, nil
+}
+
+func contains(s, substr string) bool {
+	return strings.Contains(s, substr)
 }
 
 func (s *MemoryServiceStore) List(ctx context.Context) ([]*model.HTTPService, error) {

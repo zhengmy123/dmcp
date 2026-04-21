@@ -52,12 +52,13 @@ func (s *MCPServerService) ListServers(ctx context.Context) ([]*model.MCPServer,
 }
 
 // ListServersWithToolCount 分页获取 MCPServer 并统计工具数量
-func (s *MCPServerService) ListServersWithToolCount(ctx context.Context, page, pageSize int, name string, state *int) ([]*repository.MCPServerWithToolCount, int64, error) {
+func (s *MCPServerService) ListServersWithToolCount(ctx context.Context, page, pageSize int, name string, state *int, serverType string) ([]*repository.MCPServerWithToolCount, int64, error) {
 	query := &repository.MCPServerQuery{
 		Page:     page,
 		PageSize: pageSize,
 		Name:     name,
 		State:    state,
+		Type:     serverType,
 	}
 	return s.serverStore.ListWithToolCount(ctx, query)
 }

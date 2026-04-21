@@ -24,9 +24,9 @@
     </div>
 
     <!-- Main Content -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <!-- Recent Tokens -->
-      <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200">
+      <div class="bg-white rounded-xl border border-gray-200">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h3 class="font-semibold text-gray-900">最近 Token</h3>
           <router-link to="/tokens" class="text-sm text-primary-600 hover:text-primary-700">
@@ -69,44 +69,45 @@
         </div>
       </div>
 
-      <!-- Service Groups -->
+      <!-- MCP Servers -->
       <div class="bg-white rounded-xl border border-gray-200">
         <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h3 class="font-semibold text-gray-900">服务分组</h3>
-          <router-link to="/tools" class="text-sm text-primary-600 hover:text-primary-700">
+          <h3 class="font-semibold text-gray-900">MCP Servers</h3>
+          <router-link to="/mcp-servers" class="text-sm text-primary-600 hover:text-primary-700">
             查看全部 →
           </router-link>
         </div>
         <div class="p-6">
-          <div v-if="toolsStore.loading" class="text-center py-8">
+          <div v-if="mcpServersStore.loading" class="text-center py-8">
             <div class="loading-spinner mx-auto"></div>
             <p class="text-gray-500 mt-2">加载中...</p>
           </div>
-          <div v-else-if="Object.keys(toolsStore.groupedTools).length === 0" class="text-center py-8 text-gray-500">
-            暂无服务分组
+          <div v-else-if="mcpServersStore.servers.length === 0" class="text-center py-8 text-gray-500">
+            暂无 MCP Server
           </div>
           <div v-else class="space-y-3">
             <div
-              v-for="(tools, group) in toolsStore.groupedTools"
-              :key="group"
-              class="p-3 bg-gray-50 rounded-lg"
+              v-for="server in mcpServersStore.servers.slice(0, 3)"
+              :key="server.id"
+              class="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
             >
-              <div class="flex items-center justify-between mb-2">
-                <span class="font-medium text-gray-900">{{ group }}</span>
-                <span class="text-xs text-gray-500">{{ tools.length }} 个工具</span>
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <svg class="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="font-medium text-gray-900">{{ server.name }}</p>
+                  <p class="text-xs text-gray-500">{{ server.tool_count || 0 }} 个工具</p>
+                </div>
               </div>
-              <div class="flex flex-wrap gap-1">
-                <span
-                  v-for="tool in tools.slice(0, 3)"
-                  :key="tool.name"
-                  class="px-2 py-0.5 text-xs bg-primary-50 text-primary-700 rounded"
-                >
-                  {{ tool.name }}
-                </span>
-                <span v-if="tools.length > 3" class="text-xs text-gray-500">
-                  +{{ tools.length - 3 }}
-                </span>
-              </div>
+              <span
+                class="px-2.5 py-1 text-xs font-medium rounded-full"
+                :class="server.state === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+              >
+                {{ server.state === 1 ? '正常' : '禁用' }}
+              </span>
             </div>
           </div>
         </div>
@@ -171,9 +172,11 @@
 import { computed, h, onMounted } from 'vue'
 import { useTokenStore } from '@/stores/tokens'
 import { useToolsStore } from '@/stores/tools'
+import { useMCPServersStore } from '@/stores/mcpServers'
 
 const tokenStore = useTokenStore()
 const toolsStore = useToolsStore()
+const mcpServersStore = useMCPServersStore()
 
 const stats = computed(() => [
   {
@@ -208,13 +211,13 @@ const stats = computed(() => [
     ])
   },
   {
-    title: '服务分组',
-    value: toolsStore.serviceCount,
-    subtitle: 'MCP Server',
+    title: 'MCP Server',
+    value: mcpServersStore.servers.length,
+    subtitle: 'MCP 服务',
     bgClass: 'bg-orange-100',
     iconClass: 'w-6 h-6 text-orange-600',
     icon: h('svg', { fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
-      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10' })
+      h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01' })
     ])
   }
 ])
@@ -222,5 +225,6 @@ const stats = computed(() => [
 onMounted(() => {
   tokenStore.fetchTokens()
   toolsStore.fetchTools()
+  mcpServersStore.fetchServers()
 })
 </script>

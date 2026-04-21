@@ -36,9 +36,9 @@ export const authApi = {
     return request.delete(`/api/v1/users/${id}`)
   },
 
-  // 获取所有 Token
-  getTokens() {
-    return request.get('/api/v1/auth/tokens')
+  // 获取所有 Token（支持分页）
+  getTokens(params = {}) {
+    return request.get('/api/v1/auth/tokens', { params })
   },
 
   // 创建 Token

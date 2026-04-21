@@ -42,7 +42,6 @@
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">名称</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
-              <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">最后使用</th>
               <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
               <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
             </tr>
@@ -98,9 +97,6 @@
                 </span>
               </td>
               <td class="px-6 py-4 text-sm text-gray-500">
-                {{ token.last_used ? formatDate(token.last_used) : '从未使用' }}
-              </td>
-              <td class="px-6 py-4 text-sm text-gray-500">
                 {{ formatDate(token.created_at) }}
               </td>
               <td class="px-6 py-4 text-right">
@@ -138,6 +134,45 @@
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    <div v-if="tokenStore.pagination.total > 0" class="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+      <div class="text-sm text-gray-500">
+        共 <span class="font-medium">{{ tokenStore.pagination.total }}</span> 条记录，第
+        <span class="font-medium">{{ tokenStore.pagination.page }}</span> /
+        <span class="font-medium">{{ totalPages }}</span> 页
+      </div>
+      <div class="flex items-center space-x-2">
+        <button
+          @click="goToPage(tokenStore.pagination.page - 1)"
+          :disabled="tokenStore.pagination.page <= 1"
+          class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+        >
+          上一页
+        </button>
+        <div class="flex items-center space-x-1">
+          <button
+            v-for="page in visiblePages"
+            :key="page"
+            @click="page !== '...' && goToPage(page)"
+            class="w-8 h-8 text-sm rounded-lg transition-colors"
+            :class="page === tokenStore.pagination.page
+              ? 'bg-primary-600 text-white'
+              : 'border border-gray-300 hover:bg-gray-50'"
+            :disabled="page === '...'"
+          >
+            {{ page }}
+          </button>
+        </div>
+        <button
+          @click="goToPage(tokenStore.pagination.page + 1)"
+          :disabled="tokenStore.pagination.page >= totalPages"
+          class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
+        >
+          下一页
+        </button>
       </div>
     </div>
 
@@ -350,6 +385,57 @@ const copyText = async (text, tokenId, secretId = null) => {
 }
 
 onMounted(() => {
-  tokenStore.fetchTokens()
+  tokenStore.fetchTokens({
+    page: 1,
+    pageSize: 10
+  })
+})
+
+const handlePageSizeChange = () => {
+  tokenStore.fetchTokens({
+    page: 1,
+    pageSize: tokenStore.pagination.pageSize
+  })
+}
+
+const goToPage = (page) => {
+  tokenStore.fetchTokens({
+    page: page
+  })
+}
+
+const totalPages = computed(() => {
+  const total = tokenStore.pagination.total
+  const size = tokenStore.pagination.pageSize
+  return Math.ceil(total / size) || 1
+})
+
+const visiblePages = computed(() => {
+  const current = tokenStore.pagination.page
+  const total = totalPages.value
+  const pages = []
+
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) {
+      pages.push(i)
+    }
+  } else {
+    if (current <= 4) {
+      for (let i = 1; i <= 5; i++) pages.push(i)
+      pages.push('...')
+      pages.push(total)
+    } else if (current >= total - 3) {
+      pages.push(1)
+      pages.push('...')
+      for (let i = total - 4; i <= total; i++) pages.push(i)
+    } else {
+      pages.push(1)
+      pages.push('...')
+      for (let i = current - 1; i <= current + 1; i++) pages.push(i)
+      pages.push('...')
+      pages.push(total)
+    }
+  }
+  return pages
 })
 </script>

@@ -40,14 +40,47 @@ func (c *Controller) RegisterRoutes(router *gin.RouterGroup) {
 }
 
 func (c *Controller) listServices(ctx *gin.Context) {
-	services, err := c.store.List(ctx.Request.Context())
+	query := &model.ServiceQuery{}
+
+	// 解析名称搜索参数
+	name := ctx.Query("name")
+	if name != "" {
+		query.Name = &name
+	}
+
+	// 解析状态筛选参数
+	stateStr := ctx.Query("state")
+	if stateStr != "" {
+		state, err := strconv.Atoi(stateStr)
+		if err == nil && (state == 0 || state == 1) {
+			query.State = &state
+		}
+	}
+
+	// 解析分页参数
+	page, err := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	if err != nil || page < 1 {
+		page = 1
+	}
+	query.Page = page
+
+	pageSize, err := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
+	if err != nil || pageSize < 1 {
+		pageSize = 10
+	}
+	query.PageSize = pageSize
+
+	services, total, err := c.store.ListWithQuery(ctx.Request.Context(), query)
 	if err != nil {
 		response.InternalError(ctx, "failed to list services: "+err.Error())
 		return
 	}
+
 	response.Success(ctx, gin.H{
-		"services": services,
-		"count":    len(services),
+		"services":  services,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
 	})
 }
 

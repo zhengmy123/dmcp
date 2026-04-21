@@ -25,6 +25,10 @@ func NewGORMServiceStore(db *gorm.DB, log logger.Logger) *GORMServiceStore {
 	}
 }
 
+func (s *GORMServiceStore) ListWithQuery(ctx context.Context, query *model.ServiceQuery) ([]*model.HTTPService, int64, error) {
+	return s.dao.ListWithQuery(ctx, query)
+}
+
 func (s *GORMServiceStore) List(ctx context.Context) ([]*model.HTTPService, error) {
 	return s.dao.List(ctx)
 }

@@ -43,7 +43,7 @@ func startHTTPServer(cfg config.Config, comp *ServerComponents) {
 	engine.RedirectTrailingSlash = false
 
 	httpAPI.RegisterRoutes(
-		engine, comp.Registry, comp.GroupMCP, comp.AuthService,
+		engine, comp.Registry, comp.GroupMCP, comp.ProxyHandler, comp.AuthService,
 		comp.HTTPServiceMgr, comp.ServiceStore, comp.MCPServerStore,
 		comp.ToolStore, comp.ToolBindingStore, comp.BuildInfoStore,
 		comp.JWTManager, appLog, comp.GORMDB,

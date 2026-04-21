@@ -21,7 +21,6 @@ CREATE TABLE IF NOT EXISTS `mcp_auth_keys` (
     `name` VARCHAR(128) NOT NULL COMMENT '密钥名称',
     `description` VARCHAR(512) DEFAULT '' COMMENT '密钥描述',
     `state` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态 1-正常 0-删除',
-    `last_used_at` DATETIME DEFAULT NULL COMMENT '最后使用时间',
     `expires_at` DATETIME DEFAULT NULL COMMENT '过期时间',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -33,6 +32,12 @@ CREATE TABLE IF NOT EXISTS `mcp_auth_keys` (
 -- ============================================
 -- 步骤2: 创建 mcp_servers 表（MCP服务信息）
 -- ============================================
+-- 注意：headers 字段合并了 auth_header 和 extra_headers
+-- 如果是从旧版本升级，需要执行：
+-- ALTER TABLE `mcp_servers` ADD COLUMN `headers` TEXT COMMENT '请求Headers，每行一个 Key: Value' AFTER `http_server_url`;
+-- UPDATE `mcp_servers` SET `headers` = CONCAT_WS('\n', `auth_header`, `extra_headers`) WHERE `auth_header` != '' OR `extra_headers` != '';
+-- ALTER TABLE `mcp_servers` DROP COLUMN `auth_header`, DROP COLUMN `extra_headers`;
+-- ============================================
 CREATE TABLE IF NOT EXISTS `mcp_servers` (
     `id` INT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
     `v_auth_key` VARCHAR(128) NOT NULL COMMENT '认证密钥',
@@ -40,9 +45,8 @@ CREATE TABLE IF NOT EXISTS `mcp_servers` (
     `description` VARCHAR(512) DEFAULT '' COMMENT '服务描述',
     `type` VARCHAR(32) NOT NULL DEFAULT 'http_service' COMMENT '服务类型',
     `http_server_url` VARCHAR(512) DEFAULT '' COMMENT 'HTTP服务URL',
-    `auth_header` VARCHAR(256) DEFAULT '' COMMENT '认证Header',
+    `headers` TEXT COMMENT '请求Headers，每行一个 Key: Value',
     `timeout_seconds` INT NOT NULL DEFAULT 30 COMMENT '超时秒数',
-    `extra_headers` TEXT COMMENT '额外Headers',
     `state` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态 1-正常 0-删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

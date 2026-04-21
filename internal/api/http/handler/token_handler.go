@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"strconv"
+
 	"dynamic_mcp_go_server/internal/common/response"
 	"dynamic_mcp_go_server/internal/service"
 
@@ -19,12 +21,22 @@ func RegisterTokenRoutes(g *gin.RouterGroup, authService *service.AuthService) {
 
 func listTokens(authService *service.AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		tokens := authService.ListTokens(c.Request.Context())
+		page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
+		if err != nil || page < 1 {
+			page = 1
+		}
+
+		pageSize, err := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+		if err != nil || pageSize < 1 {
+			pageSize = 10
+		}
+
+		tokens, total := authService.ListTokensPaginated(c.Request.Context(), page, pageSize)
 		response.Success(c, gin.H{
 			"items":     tokens,
-			"total":     len(tokens),
-			"page":      1,
-			"page_size": len(tokens),
+			"total":     total,
+			"page":      page,
+			"page_size": pageSize,
 		})
 	}
 }

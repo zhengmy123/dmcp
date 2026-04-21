@@ -53,6 +53,10 @@ func (d *GORMMCPServerDAO) ListWithToolCount(ctx context.Context, query *reposit
 		whereClause += " AND state = ?"
 		args = append(args, *query.State)
 	}
+	if query.Type != "" {
+		whereClause += " AND type = ?"
+		args = append(args, query.Type)
+	}
 
 	var total int64
 	if err := db.Model(&model.MCPServer{}).Where(whereClause, args...).Count(&total).Error; err != nil {

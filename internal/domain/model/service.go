@@ -65,6 +65,14 @@ func (HTTPService) TableName() string {
 	return "mcp_http_services"
 }
 
+// ServiceQuery 定义HTTP服务查询参数
+type ServiceQuery struct {
+	Name     *string // 名称模糊匹配
+	State    *int    // 状态筛选 (0-已删除, 1-正常)
+	Page     int     // 页码 (默认1)
+	PageSize int     // 每页条数 (默认10)
+}
+
 // RequestData 定义HTTP请求数据
 type RequestData struct {
 	Headers  map[string]string `json:"headers,omitempty"`

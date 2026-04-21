@@ -1,9 +1,9 @@
 import { request } from './request'
 
 export const servicesApi = {
-  // 获取所有 HTTP 服务
-  getServices() {
-    return request.get('/api/v1/services')
+  // 获取 HTTP 服务（支持分页和搜索）
+  getServices(params = {}) {
+    return request.get('/api/v1/services', { params })
   },
 
   // 获取简化版服务列表（只返回id和name）

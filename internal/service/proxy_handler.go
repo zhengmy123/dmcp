@@ -12,8 +12,6 @@ import (
 	"dynamic_mcp_go_server/internal/common/logger"
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
-
-	"github.com/bytedance/sonic"
 )
 
 type ProxyHandler struct {
@@ -108,13 +106,7 @@ func (h *ProxyHandler) getProxyServerWithCache(ctx context.Context, vauthKey str
 		return nil, nil
 	}
 
-	var extraHeaders map[string]string
-	if server.ExtraHeaders != "" {
-		if err := sonic.Unmarshal([]byte(server.ExtraHeaders), &extraHeaders); err != nil {
-			h.logger.Warn("parse extra headers failed", logger.Error(err))
-			extraHeaders = make(map[string]string)
-		}
-	}
+	authHeader, extraHeaders := parseHeadersFromString(server.Headers)
 
 	timeoutSeconds := server.TimeoutSeconds
 	if timeoutSeconds <= 0 {
@@ -126,7 +118,7 @@ func (h *ProxyHandler) getProxyServerWithCache(ctx context.Context, vauthKey str
 		VAuthKey:       server.VAuthKey,
 		Name:           server.Name,
 		HTTPServerURL:  server.HTTPServerURL,
-		AuthHeader:     server.AuthHeader,
+		AuthHeader:     authHeader,
 		TimeoutSeconds: timeoutSeconds,
 		ExtraHeaders:   extraHeaders,
 		State:          server.State,
@@ -190,6 +182,40 @@ func (h *ProxyHandler) proxyRequest(ctx context.Context, server *CachedProxyServ
 	return client.Do(proxyReq)
 }
 
+func parseHeadersFromString(headers string) (authHeader string, extraHeaders map[string]string) {
+	extraHeaders = make(map[string]string)
+	if headers == "" {
+		return "", extraHeaders
+	}
+
+	lines := strings.Split(strings.TrimSpace(headers), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		idx := strings.Index(line, ":")
+		if idx == -1 {
+			continue
+		}
+
+		key := strings.TrimSpace(line[:idx])
+		value := strings.TrimSpace(line[idx+1:])
+
+		lowerKey := strings.ToLower(key)
+		if lowerKey == "authorization" || lowerKey == "x-mcp-token" {
+			if authHeader == "" {
+				authHeader = key + ": " + value
+			}
+		} else {
+			extraHeaders[key] = value
+		}
+	}
+
+	return authHeader, extraHeaders
+}
+
 func (h *ProxyHandler) InvalidateCache(ctx context.Context, vauthKey string) {
 	if h.proxyCache != nil {
 		if err := h.proxyCache.DeleteProxyServer(ctx, vauthKey); err != nil {
@@ -203,13 +229,7 @@ func (h *ProxyHandler) UpdateCache(ctx context.Context, server *model.MCPServer)
 		return
 	}
 
-	var extraHeaders map[string]string
-	if server.ExtraHeaders != "" {
-		if err := sonic.Unmarshal([]byte(server.ExtraHeaders), &extraHeaders); err != nil {
-			h.logger.Warn("parse extra headers failed", logger.Error(err))
-			extraHeaders = make(map[string]string)
-		}
-	}
+	authHeader, extraHeaders := parseHeadersFromString(server.Headers)
 
 	timeoutSeconds := server.TimeoutSeconds
 	if timeoutSeconds <= 0 {
@@ -221,7 +241,7 @@ func (h *ProxyHandler) UpdateCache(ctx context.Context, server *model.MCPServer)
 		VAuthKey:       server.VAuthKey,
 		Name:           server.Name,
 		HTTPServerURL:  server.HTTPServerURL,
-		AuthHeader:     server.AuthHeader,
+		AuthHeader:     authHeader,
 		TimeoutSeconds: timeoutSeconds,
 		ExtraHeaders:   extraHeaders,
 		State:          server.State,

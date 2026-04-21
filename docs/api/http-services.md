@@ -6,7 +6,15 @@
 
 ### GET /api/v1/services
 
-获取服务列表。
+获取服务列表（支持分页和搜索）。
+
+**查询参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| name | string | 否 | 服务名称（模糊匹配） |
+| state | int | 否 | 状态筛选（0-已删除，1-正常） |
+| page | int | 否 | 页码（默认1） |
+| page_size | int | 否 | 每页条数（默认10） |
 
 **响应示例**:
 ```json
@@ -14,8 +22,19 @@
   "code": 0,
   "message": "success",
   "data": {
-    "services": [ ... ],
-    "count": 10
+    "services": [
+      {
+        "id": 1,
+        "name": "Service Name",
+        "method": "POST",
+        "target_url": "https://api.example.com",
+        "state": 1,
+        "created_at": "2024-01-01T00:00:00Z"
+      }
+    ],
+    "total": 100,
+    "page": 1,
+    "page_size": 10
   }
 }
 ```

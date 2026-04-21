@@ -9,15 +9,20 @@ export const useServicesStore = defineStore('services', () => {
 
   const pagination = ref({
     page: 1,
-    pageSize: 20,
+    pageSize: 10,
     total: 0
   })
 
-  const fetchServices = async () => {
+  const fetchServices = async (params = {}) => {
     loading.value = true
     error.value = null
     try {
-      const res = await servicesApi.getServices()
+      const queryParams = {
+        page: params.page || pagination.value.page,
+        page_size: params.pageSize || pagination.value.pageSize,
+        ...params
+      }
+      const res = await servicesApi.getServices(queryParams)
       const data = res.data || res
       const items = data.services || data.items || []
       services.value = items
@@ -86,6 +91,7 @@ export const useServicesStore = defineStore('services', () => {
     services,
     loading,
     error,
+    pagination,
     fetchServices,
     createService,
     updateService,

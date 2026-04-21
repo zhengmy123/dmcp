@@ -172,6 +172,7 @@ export const useMCPServersStore = defineStore('mcpServers', () => {
     currentServer,
     loading,
     error,
+    pagination,
     fetchServers,
     fetchServer,
     createServer,

@@ -2,13 +2,13 @@ package database
 
 import (
 	"context"
-	"github.com/bytedance/sonic"
 	"fmt"
+
+	"github.com/bytedance/sonic"
+	"gorm.io/gorm"
 
 	"dynamic_mcp_go_server/internal/common/logger"
 	"dynamic_mcp_go_server/internal/domain/model"
-
-	"gorm.io/gorm"
 )
 
 // GORMServiceDAO GORM实现的服务DAO
@@ -23,6 +23,52 @@ func NewGORMServiceDAO(db *gorm.DB, log logger.Logger) *GORMServiceDAO {
 		db:     db,
 		logger: log,
 	}
+}
+
+// ListWithQuery 获取服务列表（支持分页和搜索）
+func (d *GORMServiceDAO) ListWithQuery(ctx context.Context, query *model.ServiceQuery) ([]*model.HTTPService, int64, error) {
+	var services []*model.HTTPService
+	var total int64
+
+	db := d.db.WithContext(ctx).Model(&model.HTTPService{})
+
+	// 名称模糊匹配
+	if query.Name != nil && *query.Name != "" {
+		db = db.Where("name LIKE ?", "%"+*query.Name+"%")
+	}
+
+	// 状态筛选
+	if query.State != nil {
+		db = db.Where("state = ?", *query.State)
+	}
+
+	// 统计总数
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// 默认分页参数
+	page := query.Page
+	if page < 1 {
+		page = 1
+	}
+	pageSize := query.PageSize
+	if pageSize < 1 {
+		pageSize = 10
+	}
+
+	// 分页查询
+	offset := (page - 1) * pageSize
+	result := db.Offset(offset).Limit(pageSize).Order("id DESC").Find(&services)
+	if result.Error != nil {
+		return nil, 0, result.Error
+	}
+
+	for _, s := range services {
+		d.unmarshalJSONFields(s)
+	}
+
+	return services, total, nil
 }
 
 // List 获取所有启用的服务

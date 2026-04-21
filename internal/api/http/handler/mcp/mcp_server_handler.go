@@ -22,9 +22,10 @@ func generateVAuthKeyFromUUID() string {
 }
 
 type MCPServerHandler struct {
-	service     *service.MCPServerService
-	toolService *service.ToolService
-	logger      logger.Logger
+	service      *service.MCPServerService
+	toolService  *service.ToolService
+	proxyHandler *service.ProxyHandler
+	logger       logger.Logger
 }
 
 func NewMCPServerHandler(
@@ -33,6 +34,7 @@ func NewMCPServerHandler(
 	toolBindingStore repository.ToolServerBindingStore,
 	serverBuildInfoStore repository.ServerBuildInfoStore,
 	serviceStore repository.ServiceStore,
+	proxyHandler *service.ProxyHandler,
 	log logger.Logger,
 ) *MCPServerHandler {
 	serverBuildService := service.NewServerBuildService(mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, serviceStore, nil)
@@ -40,9 +42,10 @@ func NewMCPServerHandler(
 	mcpServerService := service.NewMCPServerService(mcpServerStore, serverBuildInfoStore, toolStore, toolBindingStore, serverBuildService)
 
 	return &MCPServerHandler{
-		service:     mcpServerService,
-		toolService: toolService,
-		logger:      log,
+		service:      mcpServerService,
+		toolService:  toolService,
+		proxyHandler: proxyHandler,
+		logger:       log,
 	}
 }
 
@@ -56,7 +59,8 @@ type ListServersResponse struct {
 
 type ServerWithToolCount struct {
 	*model.MCPServer
-	ToolCount int64 `json:"tool_count"`
+	ToolCount int64                  `json:"tool_count"`
+	Tools     []model.ToolDefinition `json:"tools,omitempty"`
 }
 
 func (h *MCPServerHandler) ListServers(ctx *gin.Context) {
@@ -64,6 +68,7 @@ func (h *MCPServerHandler) ListServers(ctx *gin.Context) {
 	pageSizeStr := ctx.DefaultQuery("page_size", "10")
 	name := ctx.Query("name")
 	stateStr := ctx.Query("state")
+	typeStr := ctx.Query("type")
 
 	page, err := strconv.Atoi(pageStr)
 	if err != nil || page < 1 {
@@ -86,7 +91,7 @@ func (h *MCPServerHandler) ListServers(ctx *gin.Context) {
 		}
 	}
 
-	serversWithCount, total, err := h.service.ListServersWithToolCount(ctx.Request.Context(), page, pageSize, name, state)
+	serversWithCount, total, err := h.service.ListServersWithToolCount(ctx.Request.Context(), page, pageSize, name, state, typeStr)
 	if err != nil {
 		response.InternalError(ctx, err.Error())
 		return
@@ -142,9 +147,8 @@ type CreateServerRequest struct {
 	Name           string `json:"name" binding:"required"`
 	Description    string `json:"description"`
 	HTTPServerURL  string `json:"http_server_url"`
-	AuthHeader     string `json:"auth_header"`
+	Headers        string `json:"headers"`
 	TimeoutSeconds int    `json:"timeout_seconds"`
-	ExtraHeaders   string `json:"extra_headers"`
 }
 
 func (h *MCPServerHandler) CreateServer(ctx *gin.Context) {
@@ -162,9 +166,8 @@ func (h *MCPServerHandler) CreateServer(ctx *gin.Context) {
 		Description:    req.Description,
 		Type:           req.Type,
 		HTTPServerURL:  req.HTTPServerURL,
-		AuthHeader:     req.AuthHeader,
+		Headers:        req.Headers,
 		TimeoutSeconds: req.TimeoutSeconds,
-		ExtraHeaders:   req.ExtraHeaders,
 	}
 
 	if err := h.service.CreateServer(ctx.Request.Context(), &server); err != nil {
@@ -187,9 +190,8 @@ type UpdateServerRequest struct {
 	Name           string `json:"name"`
 	Description    string `json:"description"`
 	HTTPServerURL  string `json:"http_server_url"`
-	AuthHeader     string `json:"auth_header"`
+	Headers        string `json:"headers"`
 	TimeoutSeconds int    `json:"timeout_seconds"`
-	ExtraHeaders   string `json:"extra_headers"`
 }
 
 func (h *MCPServerHandler) UpdateServer(ctx *gin.Context) {
@@ -216,6 +218,10 @@ func (h *MCPServerHandler) UpdateServer(ctx *gin.Context) {
 		return
 	}
 
+	if req.Headers != "" {
+		server.Headers = req.Headers
+	}
+
 	if req.Name != "" {
 		server.Name = req.Name
 	}
@@ -228,14 +234,8 @@ func (h *MCPServerHandler) UpdateServer(ctx *gin.Context) {
 	if req.HTTPServerURL != "" {
 		server.HTTPServerURL = req.HTTPServerURL
 	}
-	if req.AuthHeader != "" {
-		server.AuthHeader = req.AuthHeader
-	}
 	if req.TimeoutSeconds > 0 {
 		server.TimeoutSeconds = req.TimeoutSeconds
-	}
-	if req.ExtraHeaders != "" {
-		server.ExtraHeaders = req.ExtraHeaders
 	}
 
 	if err := h.service.UpdateServer(ctx.Request.Context(), server); err != nil {
@@ -252,6 +252,10 @@ func (h *MCPServerHandler) UpdateServer(ctx *gin.Context) {
 		return
 	}
 
+	if h.proxyHandler != nil && server.Type == "proxy" {
+		h.proxyHandler.UpdateCache(ctx.Request.Context(), server)
+	}
+
 	response.Success(ctx, gin.H{
 		"server_id": server.ID,
 	})
@@ -265,6 +269,16 @@ func (h *MCPServerHandler) DeleteServer(ctx *gin.Context) {
 		return
 	}
 
+	server, err := h.service.GetServer(ctx.Request.Context(), uint(id))
+	if err != nil {
+		if err == service.ErrMCPServerNotFound {
+			response.NotFound(ctx, "mcp server not found")
+			return
+		}
+		response.InternalError(ctx, err.Error())
+		return
+	}
+
 	if err := h.service.DeleteServer(ctx.Request.Context(), uint(id)); err != nil {
 		if err == service.ErrMCPServerNotFound {
 			response.NotFound(ctx, "mcp server not found")
@@ -272,6 +286,10 @@ func (h *MCPServerHandler) DeleteServer(ctx *gin.Context) {
 		}
 		response.InternalError(ctx, err.Error())
 		return
+	}
+
+	if h.proxyHandler != nil && server.Type == "proxy" {
+		h.proxyHandler.InvalidateCache(ctx.Request.Context(), server.VAuthKey)
 	}
 
 	response.Success(ctx, gin.H{
@@ -287,6 +305,16 @@ func (h *MCPServerHandler) RestoreServer(ctx *gin.Context) {
 		return
 	}
 
+	server, err := h.service.GetServer(ctx.Request.Context(), uint(id))
+	if err != nil {
+		if err == service.ErrMCPServerNotFound {
+			response.NotFound(ctx, "mcp server not found")
+			return
+		}
+		response.InternalError(ctx, err.Error())
+		return
+	}
+
 	if err := h.service.RestoreServer(ctx.Request.Context(), uint(id)); err != nil {
 		if err == service.ErrMCPServerNotFound {
 			response.NotFound(ctx, "mcp server not found")
@@ -294,6 +322,10 @@ func (h *MCPServerHandler) RestoreServer(ctx *gin.Context) {
 		}
 		response.InternalError(ctx, err.Error())
 		return
+	}
+
+	if h.proxyHandler != nil && server.Type == "proxy" {
+		h.proxyHandler.UpdateCache(ctx.Request.Context(), server)
 	}
 
 	response.Success(ctx, gin.H{

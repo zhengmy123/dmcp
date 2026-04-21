@@ -18,16 +18,15 @@ import (
 
 // AuthKey 认证密钥配置
 type AuthKey struct {
-	ID        uint    `json:"id"`                                          // 主键ID
-	KeyID     string  `json:"key_id"`                                      // 访问密钥ID
-	Token     string  `json:"token"`                                       // 访问令牌(Token)
-	Secret    string  `json:"secret"`                                      // 密钥Secret
-	Name      string  `json:"name"`                                        // 密钥名称/描述
-	State     int     `json:"state" gorm:"default:1;comment:状态 1-正常 0-删除"` // 状态
-	LastUsed  *string `json:"last_used"`                                   // 最后使用时间
-	ExpiresAt string  `json:"expires_at"`
-	CreatedAt string  `json:"created_at"`
-	UpdatedAt string  `json:"updated_at"`
+	ID        uint   `json:"id"`                                          // 主键ID
+	KeyID     string `json:"key_id"`                                      // 访问密钥ID
+	Token     string `json:"token"`                                       // 访问令牌(Token)
+	Secret    string `json:"secret"`                                      // 密钥Secret
+	Name      string `json:"name"`                                        // 密钥名称/描述
+	State     int    `json:"state" gorm:"default:1;comment:状态 1-正常 0-删除"` // 状态
+	ExpiresAt string `json:"expires_at"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 // AuthService 认证管理服务
@@ -94,7 +93,6 @@ type authKeyRow struct {
 	Secret    string  `gorm:"column:secret"`
 	Name      *string `gorm:"column:name"`
 	State     int     `gorm:"column:state"`
-	LastUsed  *string `gorm:"column:last_used_at"`
 	ExpiresAt *string `gorm:"column:expires_at"`
 	CreatedAt *string `gorm:"column:created_at"`
 	UpdatedAt *string `gorm:"column:updated_at"`
@@ -122,9 +120,6 @@ func (s *AuthService) loadTokensFromDB() error {
 		}
 		if r.Name != nil {
 			key.Name = *r.Name
-		}
-		if r.LastUsed != nil {
-			key.LastUsed = r.LastUsed
 		}
 		if r.ExpiresAt != nil {
 			key.ExpiresAt = *r.ExpiresAt
@@ -195,9 +190,6 @@ func (s *AuthService) loadIncrementalTokensFromDB() error {
 		if r.Name != nil {
 			key.Name = *r.Name
 		}
-		if r.LastUsed != nil {
-			key.LastUsed = r.LastUsed
-		}
 		if r.ExpiresAt != nil {
 			key.ExpiresAt = *r.ExpiresAt
 		}
@@ -237,18 +229,7 @@ func (s *AuthService) ValidateToken(token string) (bool, bool) {
 		}
 	}
 
-	// 更新最后使用时间（异步）
-	go s.updateLastUsed(key.Token)
-
 	return true, false
-}
-
-// updateLastUsed 更新最后使用时间
-func (s *AuthService) updateLastUsed(token string) {
-	if s.db == nil {
-		return
-	}
-	s.db.Table(s.tableName).Where("token = ?", token).Update("last_used_at", gorm.Expr("NOW()"))
 }
 
 // RegisterToken 注册 Token
@@ -351,6 +332,37 @@ func (s *AuthService) ListTokens(ctx context.Context) []*AuthKey {
 	return result
 }
 
+// ListTokensPaginated 分页获取 Token
+func (s *AuthService) ListTokensPaginated(ctx context.Context, page, pageSize int) ([]*AuthKey, int64) {
+	// 如果有数据库，从数据库分页读取
+	if s.db != nil {
+		return s.listTokensPaginatedFromDB(ctx, page, pageSize)
+	}
+
+	// 否则从内存缓存读取并分页
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]*AuthKey, 0, len(s.authKeys))
+	for _, key := range s.authKeys {
+		result = append(result, key)
+	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].KeyID < result[j].KeyID
+	})
+
+	total := int64(len(result))
+	start := (page - 1) * pageSize
+	if start >= len(result) {
+		return []*AuthKey{}, total
+	}
+	end := start + pageSize
+	if end > len(result) {
+		end = len(result)
+	}
+	return result[start:end], total
+}
+
 // listTokensFromDB 从数据库读取所有 Token
 func (s *AuthService) listTokensFromDB(ctx context.Context) []*AuthKey {
 	var rows []authKeyRow
@@ -371,9 +383,6 @@ func (s *AuthService) listTokensFromDB(ctx context.Context) []*AuthKey {
 		if r.Name != nil {
 			key.Name = *r.Name
 		}
-		if r.LastUsed != nil {
-			key.LastUsed = r.LastUsed
-		}
 		if r.ExpiresAt != nil {
 			key.ExpiresAt = *r.ExpiresAt
 		}
@@ -391,6 +400,52 @@ func (s *AuthService) listTokensFromDB(ctx context.Context) []*AuthKey {
 		return authKeys[i].KeyID < authKeys[j].KeyID
 	})
 	return authKeys
+}
+
+// listTokensPaginatedFromDB 从数据库分页读取 Token
+func (s *AuthService) listTokensPaginatedFromDB(ctx context.Context, page, pageSize int) ([]*AuthKey, int64) {
+	var rows []authKeyRow
+
+	// 先统计总数
+	var total int64
+	countResult := s.db.WithContext(ctx).Table(s.tableName).Where("state >= ?", 0).Count(&total)
+	if countResult.Error != nil {
+		return nil, 0
+	}
+
+	// 分页查询
+	offset := (page - 1) * pageSize
+	result := s.db.WithContext(ctx).Table(s.tableName).Where("state >= ?", 0).Offset(offset).Limit(pageSize).Order("id DESC").Find(&rows)
+	if result.Error != nil {
+		return nil, 0
+	}
+
+	var authKeys []*AuthKey
+	for _, r := range rows {
+		key := &AuthKey{
+			ID:     r.ID,
+			KeyID:  r.KeyID,
+			Token:  r.Token,
+			Secret: r.Secret,
+			State:  r.State,
+		}
+		if r.Name != nil {
+			key.Name = *r.Name
+		}
+		if r.ExpiresAt != nil {
+			key.ExpiresAt = *r.ExpiresAt
+		}
+		if r.CreatedAt != nil {
+			key.CreatedAt = *r.CreatedAt
+		}
+		if r.UpdatedAt != nil {
+			key.UpdatedAt = *r.UpdatedAt
+		}
+
+		authKeys = append(authKeys, key)
+	}
+
+	return authKeys, total
 }
 
 // DeleteToken 删除 Token
