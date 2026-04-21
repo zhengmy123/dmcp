@@ -32,13 +32,14 @@ type AuthKey struct {
 
 // AuthService 认证管理服务
 type AuthService struct {
-	adminToken string              // 后台管理 API Token
-	authKeys   map[string]*AuthKey // token -> config
-	mu         sync.RWMutex
-	db         *gorm.DB
-	tableName  string
-	stopCh     chan struct{}
-	refreshInt time.Duration
+	adminToken    string              // 后台管理 API Token
+	authKeys      map[string]*AuthKey // token -> config
+	mu            sync.RWMutex
+	db            *gorm.DB
+	tableName     string
+	stopCh        chan struct{}
+	refreshInt    time.Duration
+	lastRefreshAt *time.Time
 }
 
 // NewAuthService 创建认证管理服务
@@ -47,7 +48,7 @@ func NewAuthService(adminToken string) *AuthService {
 		adminToken: adminToken,
 		authKeys:   make(map[string]*AuthKey),
 		stopCh:     make(chan struct{}),
-		refreshInt: 5 * time.Minute,
+		refreshInt: 10 * time.Second,
 	}
 }
 
@@ -69,7 +70,6 @@ func (s *AuthService) refreshTokens(ctx context.Context) {
 	ticker := time.NewTicker(s.refreshInt)
 	defer ticker.Stop()
 
-	// 初始加载
 	if err := s.loadTokensFromDB(); err != nil {
 		fmt.Printf("initial token load failed: %v\n", err)
 	}
@@ -79,7 +79,7 @@ func (s *AuthService) refreshTokens(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if err := s.loadTokensFromDB(); err != nil {
+			if err := s.loadIncrementalTokensFromDB(); err != nil {
 				fmt.Printf("refresh tokens failed: %v\n", err)
 			}
 		}
@@ -141,7 +141,76 @@ func (s *AuthService) loadTokensFromDB() error {
 
 	s.mu.Lock()
 	s.authKeys = newKeys
+	now := time.Now()
+	s.lastRefreshAt = &now
 	s.mu.Unlock()
+
+	return nil
+}
+
+func (s *AuthService) loadIncrementalTokensFromDB() error {
+	if s.db == nil {
+		return nil
+	}
+
+	s.mu.Lock()
+	lastTime := s.lastRefreshAt
+	s.mu.Unlock()
+
+	var rows []authKeyRow
+	query := s.db.Table(s.tableName).Where("state >= ?", 0)
+
+	if lastTime != nil {
+		rangeStart := lastTime.Add(-5 * time.Second)
+		query = query.Where("updated_at >= ?", rangeStart)
+	}
+
+	result := query.Find(&rows)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if len(rows) == 0 {
+		s.mu.Lock()
+		now := time.Now()
+		s.lastRefreshAt = &now
+		s.mu.Unlock()
+		return nil
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, r := range rows {
+		key, exists := s.authKeys[r.Token]
+		if !exists {
+			key = &AuthKey{}
+			s.authKeys[r.Token] = key
+		}
+		key.ID = r.ID
+		key.KeyID = r.KeyID
+		key.Token = r.Token
+		key.Secret = r.Secret
+		key.State = r.State
+		if r.Name != nil {
+			key.Name = *r.Name
+		}
+		if r.LastUsed != nil {
+			key.LastUsed = r.LastUsed
+		}
+		if r.ExpiresAt != nil {
+			key.ExpiresAt = *r.ExpiresAt
+		}
+		if r.CreatedAt != nil {
+			key.CreatedAt = *r.CreatedAt
+		}
+		if r.UpdatedAt != nil {
+			key.UpdatedAt = *r.UpdatedAt
+		}
+	}
+
+	now := time.Now()
+	s.lastRefreshAt = &now
 
 	return nil
 }

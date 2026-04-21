@@ -110,9 +110,9 @@
               <td class="px-6 py-4 whitespace-nowrap text-center">
                 <span
                   class="px-2.5 py-1 text-xs font-medium rounded-full"
-                  :class="tool.enabled ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
+                  :class="tool.state === 1 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'"
                 >
-                  {{ tool.enabled ? '启用' : '禁用' }}
+                  {{ tool.state === 1 ? '启用' : '禁用' }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -121,8 +121,15 @@
               <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
                 <div class="flex items-center justify-end space-x-2">
                   <button
+                    @click="openBindingDialog(tool)"
+                    class="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-primary-100 text-primary-700 hover:bg-primary-200"
+                    title="管理绑定"
+                  >
+                    管理绑定
+                  </button>
+                  <button
                     @click="openEditToolDialog(tool)"
-                    class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                    class="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                     title="编辑"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,17 +137,8 @@
                     </svg>
                   </button>
                   <button
-                    @click="openBindingDialog(tool)"
-                    class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                    title="管理绑定"
-                  >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-                    </svg>
-                  </button>
-                  <button
                     @click="handleDelete(tool)"
-                    class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                     title="删除"
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

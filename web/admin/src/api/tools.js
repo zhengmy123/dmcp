@@ -1,9 +1,9 @@
 import { request } from './request'
 
 export const toolsApi = {
-  // 获取所有工具定义（现有端点，用于展示）
+  // 获取所有工具定义（管理端点，用于 Dashboard 展示）
   getTools() {
-    return request.get('/mcp')
+    return request.get('/api/admin/tools')
   },
 
   // 获取特定服务的工具

@@ -41,7 +41,7 @@ func main() {
 		Name:         "Administrator",
 		Email:        "admin@example.com",
 		Role:         model.UserRoleAdmin,
-		Enabled:      true,
+		State:        1,
 		LastLoginAt:  now,
 		CreatedAt:    now,
 		UpdatedAt:    now,

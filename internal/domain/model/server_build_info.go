@@ -26,21 +26,24 @@ type BuildData struct {
 }
 
 type ToolSnapshot struct {
-	ID          uint   `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Parameters  []byte `json:"parameters"`
-	Enabled     bool   `json:"enabled"`
+	ID            uint                   `json:"id"`
+	Name          string                 `json:"name"`
+	Description   string                 `json:"description"`
+	ServiceID     uint                   `json:"service_id"`
+	Parameters    []ParameterDefinition  `json:"parameters"`
+	InputMapping  []InputMappingField    `json:"input_mapping"`
+	OutputMapping *OutputMappingConfig    `json:"output_mapping"`
+	State         int                    `json:"state"`
 }
 
 type HTTPServiceSnapshot struct {
-	ID           uint                  `json:"id"`
-	Name         string                `json:"name"`
-	TargetURL    string                `json:"target_url"`
-	Method       string                `json:"method"`
-	Headers      map[string]string     `json:"headers"`
-	BodyType     string                `json:"body_type"`
-	Timeout      int                   `json:"timeout_seconds"`
-	InputSchema  []byte                `json:"input_schema"`
-	OutputSchema []byte                `json:"output_schema"`
+	ID            uint            `json:"id"`
+	Name          string          `json:"name"`
+	TargetURL     string          `json:"target_url"`
+	Method        string          `json:"method"`
+	Headers       JSONBytes       `json:"headers"`
+	BodyType      string          `json:"body_type"`
+	Timeout       int             `json:"timeout_seconds"`
+	InputSchema   JSONBytes       `json:"input_schema"`
+	OutputSchema  JSONBytes       `json:"output_schema"`
 }

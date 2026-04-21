@@ -7,6 +7,8 @@ import (
 
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
+
+	"gorm.io/gorm"
 )
 
 var (
@@ -20,6 +22,7 @@ type ToolBindingService struct {
 	toolStore    repository.ToolStore
 	serverStore  repository.MCPServerStore
 	buildSvc     *ServerBuildService
+	db           *gorm.DB
 }
 
 func NewToolBindingService(
@@ -27,12 +30,14 @@ func NewToolBindingService(
 	toolStore repository.ToolStore,
 	serverStore repository.MCPServerStore,
 	buildSvc *ServerBuildService,
+	db *gorm.DB,
 ) *ToolBindingService {
 	return &ToolBindingService{
 		bindingStore: bindingStore,
 		toolStore:    toolStore,
 		serverStore:  serverStore,
 		buildSvc:     buildSvc,
+		db:           db,
 	}
 }
 
@@ -113,7 +118,31 @@ func (s *ToolBindingService) UnbindTool(ctx context.Context, req BindToolRequest
 		return nil
 	}
 
-	return s.bindingStore.Delete(ctx, binding.ID)
+	tx := s.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("failed to begin transaction: %w", tx.Error)
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		}
+	}()
+
+	if err := tx.Model(&model.ToolServerBinding{}).Where("id = ?", binding.ID).Update("state", 0).Error; err != nil {
+		tx.Rollback()
+		return fmt.Errorf("failed to delete binding: %w", err)
+	}
+
+	if s.buildSvc != nil {
+		if err := s.buildSvc.BuildOrUpdate(ctx, req.ServerID, tx); err != nil {
+			tx.Rollback()
+			return fmt.Errorf("failed to build or update: %w", err)
+		}
+	}
+
+	return tx.Commit().Error
 }
 
 func (s *ToolBindingService) BatchBindTools(ctx context.Context, req BatchBindRequest) (int, error) {
@@ -192,23 +221,53 @@ func (s *ToolBindingService) BatchUnbindTools(ctx context.Context, bindingIDs []
 		return 0, fmt.Errorf("failed to list all bindings: %w", err)
 	}
 
-	existingMap := make(map[uint]int)
+	existingMap := make(map[uint]*model.ToolServerBinding)
 	for _, b := range existingBindings {
-		existingMap[b.ID] = b.State
+		existingMap[b.ID] = b
 	}
 
 	var toInvalidate []uint
+	affectedServerIDs := make(map[uint]bool)
 	for _, id := range bindingIDs {
-		state, exists := existingMap[id]
-		if exists && state == 1 {
+		binding, exists := existingMap[id]
+		if exists && binding.State == 1 {
 			toInvalidate = append(toInvalidate, id)
+			affectedServerIDs[binding.ServerID] = true
 		}
 	}
 
-	if len(toInvalidate) > 0 {
-		if err := s.bindingStore.BatchDelete(ctx, toInvalidate); err != nil {
-			return 0, fmt.Errorf("failed to invalidate bindings: %w", err)
+	if len(toInvalidate) == 0 {
+		return 0, nil
+	}
+
+	tx := s.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return 0, fmt.Errorf("failed to begin transaction: %w", tx.Error)
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
 		}
+	}()
+
+	if err := tx.Model(&model.ToolServerBinding{}).Where("id IN ? AND state = ?", toInvalidate, 1).Update("state", 0).Error; err != nil {
+		tx.Rollback()
+		return 0, fmt.Errorf("failed to invalidate bindings: %w", err)
+	}
+
+	for serverID := range affectedServerIDs {
+		if s.buildSvc != nil {
+			if err := s.buildSvc.BuildOrUpdate(ctx, serverID, tx); err != nil {
+				tx.Rollback()
+				return 0, fmt.Errorf("failed to build or update: %w", err)
+			}
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return 0, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return len(toInvalidate), nil

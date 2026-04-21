@@ -1,0 +1,38 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mcp-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: 1234qwer
+      MYSQL_DATABASE: mcp_server
+      MYSQL_USER: mcp_user
+      MYSQL_PASSWORD: mcp_pass
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --character-set-client-handshake=FALSE
+    ports:
+      - "3306:3306"
+    volumes:
+      - ~/Desktop/middleware-data/mysql_data:/var/lib/mysql
+      - ./docs/mysql_migration.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p1234qwer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mcp-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - ~/Desktop/middleware-data/redis_data:/data
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge

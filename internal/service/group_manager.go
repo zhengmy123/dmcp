@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,6 +32,7 @@ type MCPGroupManager struct {
 	buildInfoCache *BuildInfoCacheService
 	buildInfoStore repository.ServerBuildInfoStore
 	serverStore    repository.MCPServerStore
+	httpServiceMgr *HTTPServiceManager
 
 	cache *cache.TwoLevelLRU[string, http.Handler]
 
@@ -43,6 +45,7 @@ func NewMCPGroupManager(
 	buildInfoCache *BuildInfoCacheService,
 	buildInfoStore repository.ServerBuildInfoStore,
 	serverStore repository.MCPServerStore,
+	httpServiceMgr *HTTPServiceManager,
 	config MCPGroupManagerConfig,
 ) *MCPGroupManager {
 	return &MCPGroupManager{
@@ -52,17 +55,23 @@ func NewMCPGroupManager(
 		buildInfoCache: buildInfoCache,
 		buildInfoStore: buildInfoStore,
 		serverStore:    serverStore,
+		httpServiceMgr: httpServiceMgr,
 		cache:          cache.NewTwoLevelLRU[string, http.Handler](config.Cache),
 	}
 }
 
 func (m *MCPGroupManager) GetHandler(vauthKey string) (http.Handler, error) {
-	cached, ok := m.cache.Get(vauthKey)
+	buildUUID, err := m.getBuildUUID(vauthKey)
+	if err != nil {
+		return nil, err
+	}
+
+	cached, ok := m.cache.Get(buildUUID)
 	if ok {
 		return cached, nil
 	}
 
-	buildInfo, err := m.loadBuildInfo(context.Background(), vauthKey)
+	buildInfo, err := m.loadBuildInfoByBuildUUID(context.Background(), buildUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -75,9 +84,48 @@ func (m *MCPGroupManager) GetHandler(vauthKey string) (http.Handler, error) {
 		return nil, err
 	}
 
-	m.cache.Set(vauthKey, handler)
+	m.cache.Set(buildUUID, handler)
 
 	return handler, nil
+}
+
+func (m *MCPGroupManager) getBuildUUID(vauthKey string) (string, error) {
+	if m.buildInfoCache != nil {
+		cached, err := m.buildInfoCache.GetBuildUUID(context.Background(), vauthKey)
+		if err == nil && cached != nil && cached.BuildUUID != "" {
+			return cached.BuildUUID, nil
+		}
+	}
+
+	if m.serverStore == nil {
+		return "", fmt.Errorf("server store not available")
+	}
+
+	server, err := m.serverStore.GetByVAuthKey(context.Background(), vauthKey)
+	if err != nil || server == nil {
+		return "", ErrBuildInfoNotFound
+	}
+
+	buildInfo, err := m.buildInfoStore.GetActiveByServerID(context.Background(), server.ID)
+	if err != nil || buildInfo == nil {
+		return "", ErrBuildInfoNotFound
+	}
+
+	if m.buildInfoCache != nil {
+		_ = m.buildInfoCache.SetBuildUUID(context.Background(), vauthKey, &CachedBuildUUID{
+			BuildUUID: buildInfo.BuildUUID,
+			Version:   buildInfo.Version,
+		})
+	}
+
+	return buildInfo.BuildUUID, nil
+}
+
+func (m *MCPGroupManager) loadBuildInfoByBuildUUID(ctx context.Context, buildUUID string) (*model.ServerBuildInfo, error) {
+	if m.buildInfoStore == nil {
+		return nil, fmt.Errorf("build info store not available")
+	}
+	return m.buildInfoStore.GetByBuildUUID(ctx, buildUUID)
 }
 
 func (m *MCPGroupManager) loadBuildInfo(ctx context.Context, vauthKey string) (*model.ServerBuildInfo, error) {
@@ -126,7 +174,7 @@ func (m *MCPGroupManager) buildHandler(info *model.ServerBuildInfo) (http.Handle
 
 	var tools []server.ServerTool
 	for _, t := range buildData.Tools {
-		if !t.Enabled {
+		if t.State != 1 {
 			continue
 		}
 		tool, err := m.convertToServerTool(t)
@@ -151,10 +199,7 @@ func (m *MCPGroupManager) buildHandler(info *model.ServerBuildInfo) (http.Handle
 }
 
 func (m *MCPGroupManager) convertToServerTool(t model.ToolSnapshot) (server.ServerTool, error) {
-	params, err := parseToolParams(t.Parameters)
-	if err != nil {
-		return server.ServerTool{}, fmt.Errorf("parse parameters for tool %q: %w", t.Name, err)
-	}
+	params := t.Parameters
 	rawSchema, err := toRawInputSchema(params)
 	if err != nil {
 		return server.ServerTool{}, err
@@ -163,8 +208,131 @@ func (m *MCPGroupManager) convertToServerTool(t model.ToolSnapshot) (server.Serv
 	tool := mcp.NewToolWithRawSchema(t.Name, t.Description, rawSchema)
 	return server.ServerTool{
 		Tool:    tool,
-		Handler: mcpDefaultHandler(t.Name),
+		Handler: m.createToolHandler(t),
 	}, nil
+}
+
+func (m *MCPGroupManager) createToolHandler(t model.ToolSnapshot) server.ToolHandlerFunc {
+	return func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if t.ServiceID == 0 {
+			payload := map[string]any{
+				"tool":      t.Name,
+				"arguments": request.GetArguments(),
+				"error":     "tool has no service_id configured",
+			}
+			result, err := mcp.NewToolResultJSON(payload)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("marshal result: %v", err)), nil
+			}
+			return result, nil
+		}
+
+		if m.httpServiceMgr == nil {
+			payload := map[string]any{
+				"tool":      t.Name,
+				"arguments": request.GetArguments(),
+				"error":     "http service manager not available",
+			}
+			result, err := mcp.NewToolResultJSON(payload)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("marshal result: %v", err)), nil
+			}
+			return result, nil
+		}
+
+		args := request.GetArguments()
+		body := m.applyInputMapping(t.InputMapping, args)
+
+		reqData := &model.RequestData{
+			Body: body,
+		}
+
+		resp, err := m.httpServiceMgr.ExecuteService(ctx, t.ServiceID, reqData)
+		if err != nil {
+			payload := map[string]any{
+				"tool":  t.Name,
+				"error": err.Error(),
+			}
+			result, err := mcp.NewToolResultJSON(payload)
+			if err != nil {
+				return mcp.NewToolResultError(fmt.Sprintf("marshal result: %v", err)), nil
+			}
+			return result, nil
+		}
+
+		output := m.applyOutputMapping(t.OutputMapping, resp.Body)
+
+		payload := map[string]any{
+			"tool":       t.Name,
+			"statusCode": resp.StatusCode,
+		}
+		if outputMap, ok := output.(map[string]any); ok {
+			for k, v := range outputMap {
+				payload[k] = v
+			}
+		}
+		result, err := mcp.NewToolResultJSON(payload)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("marshal result: %v", err)), nil
+		}
+		return result, nil
+	}
+}
+
+func (m *MCPGroupManager) applyInputMapping(mapping []model.InputMappingField, args map[string]any) map[string]any {
+	if len(mapping) == 0 {
+		return args
+	}
+
+	result := make(map[string]any)
+	for _, field := range mapping {
+		if val, ok := args[field.Source]; ok {
+			result[field.Target] = val
+		}
+	}
+	if len(result) == 0 {
+		return args
+	}
+	return result
+}
+
+func (m *MCPGroupManager) applyOutputMapping(mapping *model.OutputMappingConfig, body interface{}) interface{} {
+	if mapping == nil || len(mapping.Fields) == 0 {
+		return body
+	}
+
+	bodyMap, ok := body.(map[string]any)
+	if !ok {
+		return body
+	}
+
+	result := make(map[string]any)
+	for _, field := range mapping.Fields {
+		val := m.getNestedValue(bodyMap, field.SourceField)
+		if val != nil {
+			result[field.TargetField] = val
+		} else if field.DefaultValue != "" {
+			result[field.TargetField] = field.DefaultValue
+		}
+	}
+	return result
+}
+
+func (m *MCPGroupManager) getNestedValue(body map[string]any, path string) interface{} {
+	parts := strings.Split(path, ".")
+	current := interface{}(body)
+	for _, part := range parts {
+		if m2, ok := current.(map[string]any); ok {
+			if v, exists := m2[part]; exists {
+				current = v
+			} else {
+				return nil
+			}
+		} else {
+			return nil
+		}
+	}
+	return current
 }
 
 func (m *MCPGroupManager) Handler(vauthKey string) (http.Handler, bool) {
@@ -177,19 +345,4 @@ func (m *MCPGroupManager) Handler(vauthKey string) (http.Handler, bool) {
 
 func (m *MCPGroupManager) ListGroups() []string {
 	return nil
-}
-
-func mcpDefaultHandler(toolName string) server.ToolHandlerFunc {
-	return func(_ context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		payload := map[string]any{
-			"tool":      toolName,
-			"arguments": request.GetArguments(),
-			"note":      "Replace defaultHandler with business logic.",
-		}
-		result, err := mcp.NewToolResultJSON(payload)
-		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("marshal result: %v", err)), nil
-		}
-		return result, nil
-	}
 }

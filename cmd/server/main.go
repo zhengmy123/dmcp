@@ -46,7 +46,7 @@ func startHTTPServer(cfg config.Config, comp *ServerComponents) {
 		engine, comp.Registry, comp.GroupMCP, comp.AuthService,
 		comp.HTTPServiceMgr, comp.ServiceStore, comp.MCPServerStore,
 		comp.ToolStore, comp.ToolBindingStore, comp.BuildInfoStore,
-		comp.JWTManager, appLog,
+		comp.JWTManager, appLog, comp.GORMDB,
 	)
 
 	if comp.UserService != nil && comp.JWTManager != nil {

@@ -16,6 +16,11 @@ func NewGORMServerBuildInfoDAO(db *gorm.DB) *GORMServerBuildInfoDAO {
 	return &GORMServerBuildInfoDAO{db: db}
 }
 
+// DB 获取数据库连接
+func (d *GORMServerBuildInfoDAO) DB() *gorm.DB {
+	return d.db
+}
+
 func (d *GORMServerBuildInfoDAO) GetByServerID(ctx context.Context, serverID uint) ([]*model.ServerBuildInfo, error) {
 	var infos []*model.ServerBuildInfo
 	err := d.db.WithContext(ctx).Where("server_id = ?", serverID).Order("version DESC").Find(&infos).Error
@@ -51,6 +56,10 @@ func (d *GORMServerBuildInfoDAO) GetByBuildUUID(ctx context.Context, buildUUID s
 
 func (d *GORMServerBuildInfoDAO) Save(ctx context.Context, info *model.ServerBuildInfo) error {
 	return d.db.WithContext(ctx).Create(info).Error
+}
+
+func (d *GORMServerBuildInfoDAO) SaveWithTx(ctx context.Context, tx *gorm.DB, info *model.ServerBuildInfo) error {
+	return tx.Create(info).Error
 }
 
 func (d *GORMServerBuildInfoDAO) UpdateState(ctx context.Context, id uint, state int) error {

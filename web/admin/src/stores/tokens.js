@@ -20,7 +20,10 @@ export const useTokenStore = defineStore('tokens', () => {
       const res = await authApi.getTokens()
       const data = res.data || res
       const items = data.items || data.tokens || []
-      tokens.value = items
+      tokens.value = items.map(item => ({
+        ...item,
+        enabled: item.state === 1
+      }))
       if (data.total !== undefined) {
         pagination.value.total = data.total
       }

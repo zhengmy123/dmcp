@@ -46,8 +46,8 @@
             <div>
               <h3 class="font-semibold text-gray-900">{{ service.name }}</h3>
               <span class="px-2 py-0.5 text-xs font-medium rounded-full"
-                :class="service.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
-                {{ service.enabled ? '启用' : '禁用' }}
+                :class="service.state === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'">
+                {{ service.state === 1 ? '启用' : '禁用' }}
               </span>
             </div>
           </div>
@@ -343,7 +343,7 @@
                   <!-- Toggle -->
                   <div class="pt-4 border-t border-gray-100">
                     <label class="flex items-center">
-                      <input v-model="form.enabled" type="checkbox" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                      <input v-model="form.state" type="checkbox" :true-value="1" :false-value="0" class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
                       <span class="ml-2 text-sm text-gray-700">启用服务</span>
                     </label>
                   </div>
@@ -809,7 +809,7 @@ const form = reactive({
   target_url: '',
   timeout_seconds: 30,
   body_type: 'JSON',
-  enabled: true,
+  state: 1,
   request_transform_script: '',
   response_transform_script: '',
 })
@@ -1108,7 +1108,7 @@ const openCreateModal = () => {
   editingService.value = null
   Object.assign(form, {
     name: '', description: '', method: 'POST', target_url: '',
-    timeout_seconds: 30, body_type: 'JSON', enabled: true,
+    timeout_seconds: 30, body_type: 'JSON', state: 1,
     request_transform_script: '', response_transform_script: '',
   })
   headersList.value = [{ key: '', value: '' }]
@@ -1134,7 +1134,7 @@ const openEditModal = (service) => {
     target_url: service.target_url,
     timeout_seconds: service.timeout_seconds,
     body_type: service.body_type || 'JSON',
-    enabled: service.enabled,
+    state: service.state,
     request_transform_script: service.request_transform_script || '',
     response_transform_script: service.response_transform_script || '',
   })

@@ -7,6 +7,7 @@ import (
 
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
+	"dynamic_mcp_go_server/internal/infrastructure/store/tooldef"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -15,14 +16,15 @@ import (
 var (
 	ErrMCPServerNotFound         = errors.New("mcp server not found")
 	ErrMCPServerExists           = errors.New("mcp server with this vauth_key already exists")
+	ErrMCPServerNameExists       = errors.New("mcp server with this name already exists")
 	ErrServerTypeCannotBeChanged = errors.New("server type cannot be changed after creation")
 )
 
 // MCPServerService 提供 MCPServer 的业务逻辑
 type MCPServerService struct {
-	serverStore        repository.MCPServerStore
-	buildInfoStore     repository.ServerBuildInfoStore
-	toolStore          repository.ToolStore
+	serverStore            repository.MCPServerStore
+	buildInfoStore         repository.ServerBuildInfoStore
+	toolStore              repository.ToolStore
 	toolServerBindingStore repository.ToolServerBindingStore
 }
 
@@ -34,9 +36,9 @@ func NewMCPServerService(
 	toolServerBindingStore repository.ToolServerBindingStore,
 ) *MCPServerService {
 	return &MCPServerService{
-		serverStore:        serverStore,
-		buildInfoStore:     buildInfoStore,
-		toolStore:          toolStore,
+		serverStore:            serverStore,
+		buildInfoStore:         buildInfoStore,
+		toolStore:              toolStore,
 		toolServerBindingStore: toolServerBindingStore,
 	}
 }
@@ -71,21 +73,35 @@ func (s *MCPServerService) GetServer(ctx context.Context, id uint) (*model.MCPSe
 
 // CreateServer 创建 MCPServer
 func (s *MCPServerService) CreateServer(ctx context.Context, server *model.MCPServer) error {
-	// 检查 vauth_key 是否已存在
-	existing, err := s.serverStore.GetByVAuthKey(ctx, server.VAuthKey)
+	if server == nil {
+		return fmt.Errorf("server cannot be nil")
+	}
+
+	existing, err := s.serverStore.GetByName(ctx, server.Name)
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
 		return err
 	}
 	if existing != nil {
-		return ErrMCPServerExists
+		return ErrMCPServerNameExists
 	}
 
-	// 保存 server
-	if err := s.serverStore.Save(ctx, server); err != nil {
+	tx := s.serverStore.DB().WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return fmt.Errorf("failed to begin transaction: %w", tx.Error)
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		}
+	}()
+
+	if err := s.serverStore.SaveWithTx(ctx, tx, server); err != nil {
+		tx.Rollback()
 		return err
 	}
 
-	// 创建空的 server_build_info（确保即使没有绑定工具也能返回有效的 build_info）
 	if s.buildInfoStore != nil {
 		emptyBuildInfo := &model.ServerBuildInfo{
 			ServerID:  server.ID,
@@ -95,9 +111,14 @@ func (s *MCPServerService) CreateServer(ctx context.Context, server *model.MCPSe
 			BuildData: `{"tools":[],"http_services":[]}`,
 			State:     1,
 		}
-		if err := s.buildInfoStore.Save(ctx, emptyBuildInfo); err != nil {
+		if err := s.buildInfoStore.SaveWithTx(ctx, tx, emptyBuildInfo); err != nil {
+			tx.Rollback()
 			return fmt.Errorf("failed to create build info: %w", err)
 		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
 	return nil
@@ -179,7 +200,7 @@ func (s *MCPServerService) GetServerTools(ctx context.Context, serverID uint) ([
 
 // AddToolToServer 向 Server 添加工具
 func (s *MCPServerService) AddToolToServer(ctx context.Context, serverID uint, tool *model.ToolDefinition) error {
-	if err := model.ValidateToolName(tool.Name); err != nil {
+	if err := tooldef.ValidateToolName(tool.Name); err != nil {
 		return err
 	}
 
@@ -191,7 +212,7 @@ func (s *MCPServerService) AddToolToServer(ctx context.Context, serverID uint, t
 		return err
 	}
 
-	tool.Enabled = true
+	tool.State = 1
 
 	if err := s.toolStore.SaveTool(ctx, tool); err != nil {
 		return err

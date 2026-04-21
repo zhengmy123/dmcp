@@ -62,7 +62,7 @@ func LoginHandler(userService *service.UserService, jwtManager *auth.JWTManager)
 				Name:        user.Name,
 				Email:       user.Email,
 				Role:        user.Role,
-				Enabled:     user.Enabled,
+				State:       user.State,
 				LastLoginAt: user.LastLoginAt,
 				CreatedAt:   user.CreatedAt,
 				UpdatedAt:   user.UpdatedAt,
@@ -92,7 +92,7 @@ func GetCurrentUserHandler(userService *service.UserService) gin.HandlerFunc {
 				Name:     user.Name,
 				Email:    user.Email,
 				Role:     user.Role,
-				Enabled:  user.Enabled,
+				State:    user.State,
 			},
 		})
 	}
@@ -154,7 +154,7 @@ func ListUsersHandler(userService *service.UserService) gin.HandlerFunc {
 				Name:        u.Name,
 				Email:       u.Email,
 				Role:        u.Role,
-				Enabled:     u.Enabled,
+				State:       u.State,
 				LastLoginAt: u.LastLoginAt,
 				CreatedAt:   u.CreatedAt,
 				UpdatedAt:   u.UpdatedAt,
@@ -197,7 +197,7 @@ func CreateUserHandler(userService *service.UserService) gin.HandlerFunc {
 				Name:     user.Name,
 				Email:    user.Email,
 				Role:     user.Role,
-				Enabled:  user.Enabled,
+				State:    user.State,
 			},
 		})
 	}
@@ -207,7 +207,7 @@ type UpdateUserRequest struct {
 	Name    string `json:"name"`
 	Email   string `json:"email"`
 	Role    string `json:"role" binding:"omitempty,oneof=admin user"`
-	Enabled *bool  `json:"enabled"`
+	State   *int   `json:"state"`
 }
 
 func UpdateUserHandler(userService *service.UserService) gin.HandlerFunc {
@@ -240,11 +240,11 @@ func UpdateUserHandler(userService *service.UserService) gin.HandlerFunc {
 		if req.Role != "" {
 			user.Role = req.Role
 		}
-		if req.Enabled != nil {
-			user.Enabled = *req.Enabled
+		if req.State != nil {
+			user.State = *req.State
 		}
 
-		err = userService.UpdateUser(c.Request.Context(), uint(userID), user.Name, user.Email, user.Role, user.Enabled)
+		err = userService.UpdateUser(c.Request.Context(), uint(userID), user.Name, user.Email, user.Role, user.State)
 		if err != nil {
 			response.InternalError(c, "failed to update user")
 			return

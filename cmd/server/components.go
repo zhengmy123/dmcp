@@ -78,6 +78,9 @@ func newServerComponents(cfg config.Config) (*ServerComponents, func(), error) {
 	}
 
 	comp.HTTPServiceMgr = service.NewHTTPServiceManager(appLogger)
+	if err := comp.HTTPServiceMgr.LoadFromStore(comp.ServiceStore); err != nil {
+		appLogger.Error("failed to load HTTP services from store", logger.Error(err))
+	}
 	comp.MCPServer = server.NewMCPServer(cfg.ServerName, cfg.ServerVersion, server.WithToolCapabilities(true), server.WithRecovery())
 
 	var redisClient *redis.Client
@@ -110,6 +113,7 @@ func newServerComponents(cfg config.Config) (*ServerComponents, func(), error) {
 		buildInfoCache,
 		comp.BuildInfoStore,
 		comp.MCPServerStore,
+		comp.HTTPServiceMgr,
 		mgrConfig,
 	)
 

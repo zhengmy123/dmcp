@@ -60,9 +60,9 @@
               </div>
               <span
                 class="px-2.5 py-1 text-xs font-medium rounded-full"
-                :class="token.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                :class="token.state === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
               >
-                {{ token.enabled ? '启用' : '禁用' }}
+                {{ token.state === 1 ? '启用' : '禁用' }}
               </span>
             </div>
           </div>
@@ -188,7 +188,7 @@ const stats = computed(() => [
   },
   {
     title: '活跃 Token',
-    value: tokenStore.tokens.filter(t => t.enabled).length,
+    value: tokenStore.tokens.filter(t => t.state === 1).length,
     subtitle: '正在使用',
     bgClass: 'bg-green-100',
     iconClass: 'w-6 h-6 text-green-600',

@@ -85,7 +85,7 @@ func (d *GORMUserDAO) Update(ctx context.Context, user *model.User) error {
 		"name":       user.Name,
 		"email":      user.Email,
 		"role":       user.Role,
-		"enabled":    user.Enabled,
+		"state":      user.State,
 		"updated_at": time.Now(),
 	})
 	if result.Error != nil {

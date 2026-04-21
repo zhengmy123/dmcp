@@ -10,12 +10,12 @@ type ToolQuery struct {
 	ID        *uint
 	Name      *string
 	ServiceID *uint
-	Enabled   *bool
+	State     *int
 	Keyword   *string
 }
 
 func (q *ToolQuery) HasCondition() bool {
-	return q.ID != nil || q.Name != nil || q.ServiceID != nil || q.Enabled != nil || q.Keyword != nil
+	return q.ID != nil || q.Name != nil || q.ServiceID != nil || q.State != nil || q.Keyword != nil
 }
 
 // ToolStore 定义工具定义存储接口

@@ -168,8 +168,8 @@ func (h *MCPServerHandler) CreateServer(ctx *gin.Context) {
 	}
 
 	if err := h.service.CreateServer(ctx.Request.Context(), &server); err != nil {
-		if err == service.ErrMCPServerExists {
-			response.Conflict(ctx, "mcp server with this vauth_key already exists")
+		if err == service.ErrMCPServerNameExists {
+			response.Conflict(ctx, "mcp server with this name already exists")
 			return
 		}
 		response.InternalError(ctx, err.Error())

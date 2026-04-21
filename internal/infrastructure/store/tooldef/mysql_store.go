@@ -41,7 +41,7 @@ func (m *GORMToolStore) List(ctx context.Context) ([]model.ToolDefinition, error
 	var rows []toolRow
 	result := m.db.WithContext(ctx).Table(m.table).
 		Select("name, description, parameters").
-		Where("enabled = ?", true).
+		Where("state = ?", 1).
 		Order("updated_at DESC").
 		Find(&rows)
 	if result.Error != nil {
@@ -54,7 +54,7 @@ func (m *GORMToolStore) List(ctx context.Context) ([]model.ToolDefinition, error
 			Name:        r.Name,
 			Description: r.Description,
 			Parameters:  nil,
-			Enabled:     true,
+			State:       1,
 		})
 	}
 	return defs, nil

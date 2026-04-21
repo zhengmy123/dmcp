@@ -8,6 +8,7 @@ import (
 	"dynamic_mcp_go_server/internal/common/response"
 	"dynamic_mcp_go_server/internal/domain/model"
 	"dynamic_mcp_go_server/internal/domain/repository"
+	"dynamic_mcp_go_server/internal/infrastructure/store/tooldef"
 
 	"github.com/bytedance/sonic"
 	"github.com/gin-gonic/gin"
@@ -49,7 +50,7 @@ type ToolItemResponse struct {
 	Parameters    []model.ParameterDefinition `json:"parameters"`
 	InputMapping  []model.InputMappingField   `json:"input_mapping"`
 	OutputMapping []model.OutputMappingField  `json:"output_mapping"`
-	Enabled       bool                        `json:"enabled"`
+	State         int                         `json:"state"`
 	CreatedAt     string                      `json:"created_at"`
 	UpdatedAt     string                      `json:"updated_at"`
 }
@@ -68,7 +69,7 @@ func (h *ToolHandler) ListTools(ctx *gin.Context) {
 
 	query := &repository.ToolQuery{
 		Keyword: &keyword,
-		Enabled: func() *bool { v := true; return &v }(),
+		State:   func() *int { v := 1; return &v }(),
 	}
 
 	tools, total, err := h.toolStore.List(ctx.Request.Context(), query, page, pageSize)
@@ -90,7 +91,7 @@ func (h *ToolHandler) ListTools(ctx *gin.Context) {
 			Parameters:    params,
 			InputMapping:  inputMapping,
 			OutputMapping: outputMapping,
-			Enabled:       t.Enabled,
+			State:         t.State,
 			CreatedAt:     t.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			UpdatedAt:     t.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		})
@@ -176,7 +177,7 @@ func (h *ToolHandler) GetTool(ctx *gin.Context) {
 			"parameters":     params,
 			"input_mapping":  inputMapping,
 			"output_mapping": outputMapping,
-			"enabled":        tool.Enabled,
+			"state":          tool.State,
 			"created_at":     tool.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 			"updated_at":     tool.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"),
 		},
@@ -208,13 +209,13 @@ func (h *ToolHandler) CreateTool(ctx *gin.Context) {
 		return
 	}
 
-	if err := model.ValidateToolName(req.Name); err != nil {
+	if err := tooldef.ValidateToolName(req.Name); err != nil {
 		response.BadRequest(ctx, "invalid tool name", err.Error())
 		return
 	}
 
 	existing, _ := h.toolStore.GetByName(ctx.Request.Context(), req.Name)
-	if existing != nil && existing.Enabled {
+	if existing != nil && existing.State == 1 {
 		response.Conflict(ctx, fmt.Sprintf("tool with name %q already exists", req.Name))
 		return
 	}
@@ -241,7 +242,7 @@ func (h *ToolHandler) CreateTool(ctx *gin.Context) {
 		ServiceID:     req.ServiceID,
 		Parameters:    paramsBytes,
 		InputMapping:  inputMappingBytes,
-		Enabled:       true,
+		State:         1,
 		OutputMapping: outputMappingBytes,
 	}
 
@@ -262,7 +263,7 @@ type UpdateToolRequest struct {
 	Parameters    []ToolParameterInput       `json:"parameters"`
 	InputMapping  []model.InputMappingField  `json:"input_mapping"`
 	OutputMapping []model.OutputMappingField `json:"output_mapping"`
-	Enabled       *bool                      `json:"enabled"`
+	State         *int                       `json:"state"`
 }
 
 func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
@@ -286,12 +287,12 @@ func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
 	}
 
 	if req.Name != "" {
-		if err := model.ValidateToolName(req.Name); err != nil {
+		if err := tooldef.ValidateToolName(req.Name); err != nil {
 			response.BadRequest(ctx, "invalid tool name", err.Error())
 			return
 		}
 		existing, _ := h.toolStore.GetByName(ctx.Request.Context(), req.Name)
-		if existing != nil && existing.ID != tool.ID && existing.Enabled {
+		if existing != nil && existing.ID != tool.ID && existing.State == 1 {
 			response.Conflict(ctx, fmt.Sprintf("tool with name %q already exists", req.Name))
 			return
 		}
@@ -319,8 +320,8 @@ func (h *ToolHandler) UpdateTool(ctx *gin.Context) {
 		}
 		tool.InputMapping = inputMappingBytes
 	}
-	if req.Enabled != nil {
-		tool.Enabled = *req.Enabled
+	if req.State != nil {
+		tool.State = *req.State
 	}
 	if req.OutputMapping != nil {
 		outputMappingBytes, err := sonic.Marshal(req.OutputMapping)

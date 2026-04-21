@@ -44,7 +44,7 @@ func (d *GORMToolDAO) List(ctx context.Context) ([]model.ToolDefinition, error) 
 	var rows []toolRow
 	result := d.db.WithContext(ctx).Table(d.table).
 		Select("name, description, parameters").
-		Where("enabled = ?", true).
+		Where("state = ?", 1).
 		Order("updated_at DESC").
 		Find(&rows)
 	if result.Error != nil {
@@ -59,7 +59,7 @@ func (d *GORMToolDAO) ListByServerID(ctx context.Context, serverID uint) ([]mode
 	var rows []toolRow
 	result := d.db.WithContext(ctx).Table(d.table).
 		Select("name, description, parameters").
-		Where("service_id = ? AND enabled = ?", serverID, true).
+		Where("service_id = ? AND state = ?", serverID, 1).
 		Order("updated_at DESC").
 		Find(&rows)
 	if result.Error != nil {
@@ -77,7 +77,7 @@ func scanToolRows(rows []toolRow) ([]model.ToolDefinition, error) {
 			Name:        r.Name,
 			Description: r.Description,
 			Parameters:  r.Parameters,
-			Enabled:     true,
+			State:       1,
 		})
 	}
 	return defs, nil

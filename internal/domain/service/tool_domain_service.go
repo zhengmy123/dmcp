@@ -12,7 +12,7 @@ var (
 	ErrOnlyHTTPServiceServerCanHaveTools = errors.New("only http_service server can have tools")
 	ErrToolNameAlreadyExists             = errors.New("tool with same name already exists in this server")
 	ErrHTTPServiceNotFound               = errors.New("http service not found")
-	ErrToolHasActiveBinding             = errors.New("tool has active binding, unbind first")
+	ErrToolHasActiveBinding              = errors.New("tool has active binding, unbind first")
 )
 
 type CreateToolFromHTTPServiceCommand struct {
@@ -61,7 +61,7 @@ func (s *ToolDomainService) CreateToolFromHTTPService(ctx context.Context, cmd C
 		Name:          cmd.Name,
 		Description:   cmd.Description,
 		OutputMapping: cmd.OutputMapping,
-		Enabled:       true,
+		State:         1,
 	}
 
 	if err := s.toolStore.Create(ctx, tool); err != nil {

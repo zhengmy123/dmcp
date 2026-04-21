@@ -13,7 +13,7 @@ import (
 // NewGORMDB 创建GORM数据库连接
 func NewGORMDB(dsn string) (*gorm.DB, error) {
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("open gorm db failed: %w", err)

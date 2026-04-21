@@ -15,6 +15,22 @@ export const useToolsStore = defineStore('tools', () => {
 
   const searchKeyword = ref('')
 
+  const groupedTools = computed(() => {
+    const groups = {}
+    for (const tool of tools.value) {
+      const groupName = tool.service_name || tool.group || '未分组'
+      if (!groups[groupName]) {
+        groups[groupName] = []
+      }
+      groups[groupName].push(tool)
+    }
+    return groups
+  })
+
+  const serviceCount = computed(() => {
+    return Object.keys(groupedTools.value).length
+  })
+
   const fetchTools = async () => {
     loading.value = true
     error.value = null
@@ -122,6 +138,8 @@ export const useToolsStore = defineStore('tools', () => {
     error,
     pagination,
     searchKeyword,
+    groupedTools,
+    serviceCount,
     fetchTools,
     fetchToolsForAdmin,
     setPage,

@@ -16,6 +16,10 @@ func NewGORMToolServerBindingDAO(db *gorm.DB) *GORMToolServerBindingDAO {
 	return &GORMToolServerBindingDAO{db: db}
 }
 
+func (d *GORMToolServerBindingDAO) DB() *gorm.DB {
+	return d.db
+}
+
 func (d *GORMToolServerBindingDAO) ListByToolID(ctx context.Context, toolID uint) ([]*model.ToolServerBinding, error) {
 	var bindings []*model.ToolServerBinding
 	err := d.db.WithContext(ctx).Where("tool_id = ? AND state = ?", toolID, 1).Find(&bindings).Error
@@ -113,21 +117,34 @@ func (d *GORMToolServerBindingDAO) DeleteByServerID(ctx context.Context, serverI
 }
 
 func (d *GORMToolServerBindingDAO) ReplaceByToolID(ctx context.Context, toolID uint, serverIDs []uint) error {
-	return d.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&model.ToolServerBinding{}).Where("tool_id = ? AND state = ?", toolID, 1).Update("state", 0).Error; err != nil {
+	tx := d.db.WithContext(ctx).Begin()
+	if tx.Error != nil {
+		return tx.Error
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		}
+	}()
+
+	if err := tx.Model(&model.ToolServerBinding{}).Where("tool_id = ? AND state = ?", toolID, 1).Update("state", 0).Error; err != nil {
+		tx.Rollback()
+		return err
+	}
+	for _, serverID := range serverIDs {
+		binding := &model.ToolServerBinding{
+			ToolID:   toolID,
+			ServerID: serverID,
+		}
+		if err := tx.Create(binding).Error; err != nil {
+			tx.Rollback()
 			return err
 		}
-		for _, serverID := range serverIDs {
-			binding := &model.ToolServerBinding{
-				ToolID:   toolID,
-				ServerID: serverID,
-			}
-			if err := tx.Create(binding).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	}
+
+	return tx.Commit().Error
 }
 
 func (d *GORMToolServerBindingDAO) BatchSave(ctx context.Context, bindings []*model.ToolServerBinding) error {

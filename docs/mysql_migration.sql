@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS `mcp_servers` (
     `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_v_auth_key` (`v_auth_key`),
+    UNIQUE KEY `uk_name` (`name`),
     INDEX `idx_created_at` (`created_at`),
     INDEX `idx_updated_at` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MCP服务表';
@@ -92,7 +93,6 @@ CREATE TABLE IF NOT EXISTS `mcp_tool_definitions` (
     `service_id` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '关联的HTTP服务ID',
     `parameters` TEXT COMMENT '参数定义JSON',
     `input_mapping` TEXT COMMENT '入参映射配置',
-    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
     `output_mapping` TEXT COMMENT '出参映射配置',
     `state` TINYINT(1) NOT NULL DEFAULT 1 COMMENT '状态 1-正常 0-删除',
     `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS `mcp_tool_definitions` (
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_name` (`name`),
     INDEX `idx_service_id` (`service_id`),
-    INDEX `idx_enabled` (`enabled`),
+    INDEX `idx_state` (`state`),
     INDEX `idx_created_at` (`created_at`),
     INDEX `idx_updated_at` (`updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='工具定义表';

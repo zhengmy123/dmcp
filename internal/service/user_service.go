@@ -37,7 +37,7 @@ func (s *UserService) CreateUser(ctx context.Context, username, password, name, 
 		Name:         name,
 		Email:        email,
 		Role:         role,
-		Enabled:      true,
+		State:        1,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
 	}
@@ -56,7 +56,7 @@ func (s *UserService) ValidatePassword(ctx context.Context, username, password s
 		return nil, err
 	}
 
-	if !user.Enabled {
+	if user.State != 1 {
 		return nil, fmt.Errorf("user is disabled")
 	}
 
@@ -100,7 +100,7 @@ func (s *UserService) DeleteUser(ctx context.Context, id uint) error {
 }
 
 // UpdateUser 更新用户信息
-func (s *UserService) UpdateUser(ctx context.Context, id uint, name, email, role string, enabled bool) error {
+func (s *UserService) UpdateUser(ctx context.Context, id uint, name, email, role string, state int) error {
 	user, err := s.dao.GetByID(ctx, id)
 	if err != nil {
 		return err
@@ -109,7 +109,7 @@ func (s *UserService) UpdateUser(ctx context.Context, id uint, name, email, role
 	user.Name = name
 	user.Email = email
 	user.Role = role
-	user.Enabled = enabled
+	user.State = state
 	user.UpdatedAt = time.Now()
 
 	return s.dao.Update(ctx, user)

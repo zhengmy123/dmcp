@@ -18,6 +18,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"go.uber.org/zap"
 )
 
 const toolsListChangedMethod = "notifications/tools/list_changed"
@@ -217,26 +218,45 @@ func (d *DynamicRegistry) ListDefinitionsByVAuthKey(vauthKey string) []tooldef.T
 
 	buildInfo, err := d.buildSvc.GetActiveBuild(ctx, mcpServer.ID)
 	if err != nil || buildInfo == nil {
+		d.logger.Debug("ListDefinitionsByVAuthKey: no active build", zap.String("vauthKey", vauthKey), zap.Uint("serverID", mcpServer.ID))
 		return nil
 	}
+
+	d.logger.Info("ListDefinitionsByVAuthKey",
+		zap.String("vauthKey", vauthKey),
+		zap.Uint("serverID", mcpServer.ID),
+		zap.Uint("buildID", buildInfo.ID),
+		zap.String("buildHash", buildInfo.Hash),
+		zap.Int("buildDataLen", len(buildInfo.BuildData)))
 
 	var buildData model.BuildData
 	if err := sonic.Unmarshal([]byte(buildInfo.BuildData), &buildData); err != nil {
+		d.logger.Error("ListDefinitionsByVAuthKey: unmarshal build data failed",
+			zap.String("vauthKey", vauthKey),
+			zap.Error(err))
 		return nil
 	}
 
+	d.logger.Info("ListDefinitionsByVAuthKey buildData",
+		zap.String("vauthKey", vauthKey),
+		zap.Int("toolsCount", len(buildData.Tools)))
+
 	defs := make([]tooldef.ToolDefinition, 0, len(buildData.Tools))
 	for _, t := range buildData.Tools {
-		if t.Enabled {
+		if t.State == 1 {
+			paramsBytes, _ := sonic.Marshal(t.Parameters)
 			defs = append(defs, tooldef.ToolDefinition{
 				ID:          t.ID,
 				Name:        t.Name,
 				Description: t.Description,
-				Parameters:  t.Parameters,
-				Enabled:     t.Enabled,
+				Parameters:  paramsBytes,
+				State:       t.State,
 			})
 		}
 	}
+	d.logger.Info("ListDefinitionsByVAuthKey result",
+		zap.String("vauthKey", vauthKey),
+		zap.Int("defsCount", len(defs)))
 	return defs
 }
 

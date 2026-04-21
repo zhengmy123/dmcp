@@ -11,6 +11,7 @@ import (
 
 	"dynamic_mcp_go_server/internal/common/logger"
 	"dynamic_mcp_go_server/internal/domain/model"
+	"dynamic_mcp_go_server/internal/domain/repository"
 
 	"github.com/bytedance/sonic"
 )
@@ -40,6 +41,33 @@ func NewHTTPServiceManager(log logger.Logger) *HTTPServiceManager {
 		},
 		validator: NewScriptValidator(log),
 	}
+}
+
+func (m *HTTPServiceManager) LoadFromStore(store repository.ServiceStore) error {
+	if store == nil {
+		return nil
+	}
+
+	services, err := store.List(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to list services from store: %w", err)
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for _, svc := range services {
+		if svc.State == 1 {
+			m.services[svc.ID] = svc
+			m.logger.Info("loaded HTTP service from store",
+				logger.Uint("service_id", svc.ID),
+				logger.String("service_name", svc.Name),
+				logger.String("target_url", svc.TargetURL),
+			)
+		}
+	}
+
+	return nil
 }
 
 // RegisterService 注册新的HTTP服务
@@ -152,7 +180,6 @@ func (m *HTTPServiceManager) UpdateService(serviceID uint, updates *model.HTTPSe
 	if updates.OutputSchema != nil {
 		service.OutputSchema = updates.OutputSchema
 	}
-	service.Enabled = updates.Enabled
 	service.UpdatedAt = time.Now()
 
 	m.logger.Info("HTTP service updated",
@@ -289,6 +316,13 @@ func (m *HTTPServiceManager) executeWithService(ctx context.Context, service *mo
 	response.StatusCode = resp.StatusCode
 	response.Headers = headers
 	response.Body = bodyObj
+
+	m.logger.Info("http service response received",
+		logger.Uint("service_id", service.ID),
+		logger.Int("status_code", resp.StatusCode),
+		logger.Duration("duration", duration),
+		logger.Any("response_body", bodyObj),
+	)
 
 	// 响应转换脚本
 	if service.HasResponseTransform() {

@@ -1,13 +1,7 @@
 package model
 
 import (
-	"errors"
-	"fmt"
-	"regexp"
-	"strings"
 	"time"
-
-	"github.com/bytedance/sonic"
 )
 
 // ParameterType 参数类型
@@ -41,9 +35,8 @@ type ToolDefinition struct {
 	ServiceID     uint      `json:"service_id" gorm:"index"`
 	Parameters    []byte    `json:"parameters" gorm:"type:text"`
 	InputMapping  []byte    `json:"input_mapping" gorm:"type:text"`
-	Enabled       bool      `json:"enabled" gorm:"default:true"`
 	OutputMapping []byte    `json:"output_mapping" gorm:"type:text"`
-	State         int       `json:"state" gorm:"default:1;comment:状态 1-正常 0-删除"`
+	State         int       `json:"state" gorm:"default:1"`
 	CreatedAt     time.Time `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt     time.Time `json:"updated_at" gorm:"autoUpdateTime"`
 }
@@ -84,70 +77,4 @@ type OutputMappingConfig struct {
 
 func (ToolDefinition) TableName() string {
 	return "mcp_tool_definitions"
-}
-
-// toolDefinitionJSON 用于严格解析 JSON，要求 enabled 显式为 true
-type toolDefinitionJSON struct {
-	Name        string                `json:"name"`
-	Description string                `json:"description"`
-	Parameters  []ParameterDefinition `json:"parameters"`
-	Enabled     *bool                 `json:"enabled"`
-}
-
-// ParseToolDefinitions 解析工具定义数组
-func ParseToolDefinitions(raw []byte) ([]ToolDefinition, error) {
-	var inputs []toolDefinitionJSON
-	if err := sonic.Unmarshal(raw, &inputs); err != nil {
-		return nil, err
-	}
-	defs := make([]ToolDefinition, 0, len(inputs))
-	for i, in := range inputs {
-		ref := fmt.Sprintf("index %d", i)
-		name := strings.TrimSpace(in.Name)
-		if name == "" {
-			return nil, fmt.Errorf("tool definition %s: missing or empty required field name", ref)
-		}
-		ref = fmt.Sprintf("%q", name)
-		if in.Enabled == nil {
-			return nil, fmt.Errorf("tool %s: missing required field enabled", ref)
-		}
-		if !*in.Enabled {
-			return nil, fmt.Errorf("tool %s: enabled must be true (got false); omit the tool from the JSON array to remove it", ref)
-		}
-		paramsJSON, err := sonic.Marshal(in.Parameters)
-		if err != nil {
-			return nil, fmt.Errorf("tool %s: marshal parameters: %w", ref, err)
-		}
-		defs = append(defs, ToolDefinition{
-			Name:        name,
-			Description: in.Description,
-			Parameters:  paramsJSON,
-			Enabled:     true,
-		})
-	}
-	return defs, nil
-}
-
-const (
-	ToolNameMinLength = 1
-	ToolNameMaxLength = 64
-	ToolNamePattern   = `^[a-zA-Z0-9_.-]+$`
-)
-
-var toolNameRegex = regexp.MustCompile(ToolNamePattern)
-
-func ValidateToolName(name string) error {
-	if name == "" {
-		return errors.New("tool name cannot be empty")
-	}
-	if len(name) > ToolNameMaxLength {
-		return errors.New("tool name cannot exceed 64 characters")
-	}
-	if len(name) < ToolNameMinLength {
-		return errors.New("tool name must be at least 1 character")
-	}
-	if !toolNameRegex.MatchString(name) {
-		return errors.New("tool name can only contain letters, numbers, underscore (_), hyphen (-), and dot (.)")
-	}
-	return nil
 }

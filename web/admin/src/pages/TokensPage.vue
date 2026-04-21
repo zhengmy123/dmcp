@@ -71,12 +71,16 @@
               <td class="px-6 py-4">
                 <div class="flex items-center space-x-2">
                   <button
-                    @click="copyText(token.token)"
-                    class="p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                    @click="copyText(token.token, token.token)"
+                    class="p-1 rounded transition-colors"
+                    :class="copiedTokenId === token.token ? 'text-green-600' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'"
                     title="复制 Token"
                   >
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg v-if="copiedTokenId !== token.token" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                     </svg>
                   </button>
                   <span class="font-mono text-sm text-gray-600 truncate max-w-[200px]">{{ token.token }}</span>
@@ -88,9 +92,9 @@
               <td class="px-6 py-4">
                 <span
                   class="px-2.5 py-1 text-xs font-medium rounded-full"
-                  :class="token.enabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                  :class="token.state === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
                 >
-                  {{ token.enabled ? '启用' : '禁用' }}
+                  {{ token.state === 1 ? '启用' : '禁用' }}
                 </span>
               </td>
               <td class="px-6 py-4 text-sm text-gray-500">
@@ -112,15 +116,13 @@
                   </button>
                   <button
                     @click="handleToggle(token)"
-                    class="p-1.5 text-gray-400 hover:text-yellow-600 hover:bg-yellow-50 rounded-lg transition-colors"
-                    :title="token.enabled ? '禁用' : '启用'"
+                    class="px-3 py-1 text-xs font-medium rounded-lg transition-colors"
+                    :class="token.state === 1 
+                      ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                      : 'bg-green-100 text-green-700 hover:bg-green-200'"
+                    :title="token.state === 1 ? '禁用' : '启用'"
                   >
-                    <svg v-if="token.enabled" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
-                    </svg>
-                    <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-                    </svg>
+                    {{ token.state === 1 ? '禁用' : '启用' }}
                   </button>
                   <button
                     @click="handleDelete(token)"
@@ -212,9 +214,12 @@
                     <label class="block text-xs font-medium text-gray-500 mb-1">Token</label>
                     <div class="flex items-center space-x-2">
                       <code class="flex-1 text-sm text-gray-900 bg-white px-2 py-1 border rounded break-all">{{ newToken.token }}</code>
-                      <button @click="copyText(newToken.token)" class="p-1 text-gray-400 hover:text-gray-600">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <button @click="copyText(newToken.token, 'token')" class="p-1 rounded transition-colors" :class="copiedTokenId === 'token' ? 'text-green-600' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'">
+                        <svg v-if="copiedTokenId !== 'token'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
                       </button>
                     </div>
@@ -223,9 +228,12 @@
                     <label class="block text-xs font-medium text-gray-500 mb-1">Secret</label>
                     <div class="flex items-center space-x-2">
                       <code class="flex-1 text-sm text-gray-900 bg-white px-2 py-1 border rounded break-all">{{ newToken.secret }}</code>
-                      <button @click="copyText(newToken.secret)" class="p-1 text-gray-400 hover:text-gray-600">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <button @click="copyText(newToken.secret, 'secret', 'secret')" class="p-1 rounded transition-colors" :class="copiedSecretId === 'secret' ? 'text-green-600' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'">
+                        <svg v-if="copiedSecretId !== 'secret'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
                       </button>
                     </div>
@@ -259,6 +267,8 @@ const showCreateModal = ref(false)
 const showResultModal = ref(false)
 const newToken = ref({ token: '', secret: '' })
 const createForm = ref({ name: '' })
+const copiedTokenId = ref(null)
+const copiedSecretId = ref('secret')
 
 const filteredTokens = computed(() => {
   if (!searchQuery.value) return tokenStore.tokens
@@ -302,8 +312,8 @@ const handleRefresh = async (token) => {
 
 const handleToggle = async (token) => {
   try {
-    await tokenStore.toggleToken(token.token, !token.enabled)
-    showToast(`Token 已${token.enabled ? '禁用' : '启用'}`, 'success')
+    await tokenStore.toggleToken(token.token, token.state !== 1)
+    showToast(`Token 已${token.state === 1 ? '禁用' : '启用'}`, 'success')
   } catch (e) {
     showToast('操作失败: ' + e.message, 'error')
   }
@@ -319,9 +329,24 @@ const handleDelete = async (token) => {
   }
 }
 
-const copyText = (text) => {
-  navigator.clipboard.writeText(text)
-  showToast('已复制到剪贴板', 'success')
+const copyText = async (text, tokenId, secretId = null) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    if (secretId) {
+      copiedSecretId.value = secretId
+    } else {
+      copiedTokenId.value = tokenId
+    }
+    setTimeout(() => {
+      if (secretId) {
+        copiedSecretId.value = null
+      } else {
+        copiedTokenId.value = null
+      }
+    }, 1500)
+  } catch (e) {
+    console.error('复制失败:', e)
+  }
 }
 
 onMounted(() => {

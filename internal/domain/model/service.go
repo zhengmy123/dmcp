@@ -31,8 +31,7 @@ type HTTPService struct {
 	ResponseTransformScript string            `json:"response_transform_script,omitempty" gorm:"type:text"`             // 响应转换脚本
 	InputSchema             JSONBytes         `json:"input_schema,omitempty" gorm:"type:text"`                          // 入参JSON Schema
 	OutputSchema            JSONBytes         `json:"output_schema,omitempty" gorm:"type:text"`                         // 出参JSON Schema
-	Enabled                 bool              `json:"enabled" gorm:"default:true;index"`
-	State                   int              `json:"state" gorm:"default:1;comment:状态 1-正常 0-删除"`
+	State                   int              `json:"state" gorm:"default:1"`
 	CreatedAt               time.Time         `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt               time.Time         `json:"updated_at" gorm:"autoUpdateTime"`
 }
@@ -234,7 +233,7 @@ func NewHTTPService(name, targetURL, method string) *HTTPService {
 		RetryCount:     DefaultRetryCount,
 		InputSchema:    []byte(`{"type":"object","properties":{}}`),
 		OutputSchema:   []byte(`{"type":"object","properties":{}}`),
-		Enabled:        true,
+		State:          1,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}

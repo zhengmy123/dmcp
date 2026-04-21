@@ -29,7 +29,7 @@ func NewGORMServiceDAO(db *gorm.DB, log logger.Logger) *GORMServiceDAO {
 func (d *GORMServiceDAO) List(ctx context.Context) ([]*model.HTTPService, error) {
 	var services []*model.HTTPService
 
-	result := d.db.WithContext(ctx).Where("enabled = ?", true).Find(&services)
+	result := d.db.WithContext(ctx).Where("state = ?", 1).Find(&services)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -45,7 +45,7 @@ func (d *GORMServiceDAO) List(ctx context.Context) ([]*model.HTTPService, error)
 func (d *GORMServiceDAO) Get(ctx context.Context, id uint) (*model.HTTPService, error) {
 	var service model.HTTPService
 
-	result := d.db.WithContext(ctx).Where("id = ? AND enabled = ?", id, true).First(&service)
+	result := d.db.WithContext(ctx).Where("id = ? AND state = ?", id, 1).First(&service)
 	if result.Error != nil {
 		if result.Error == gorm.ErrRecordNotFound {
 			return nil, fmt.Errorf("service not found")

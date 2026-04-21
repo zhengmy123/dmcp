@@ -9,6 +9,7 @@ import (
 	"dynamic_mcp_go_server/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type ToolBindingHandler struct {
@@ -19,12 +20,14 @@ type ToolBindingHandler struct {
 func NewToolBindingHandler(
 	toolBindingStore repository.ToolServerBindingStore,
 	mcpServerStore repository.MCPServerStore,
+	toolStore repository.ToolStore,
 	serverBuildInfoStore repository.ServerBuildInfoStore,
 	serviceStore repository.ServiceStore,
 	log logger.Logger,
+	db *gorm.DB,
 ) *ToolBindingHandler {
-	serverBuildService := service.NewServerBuildService(mcpServerStore, nil, toolBindingStore, serverBuildInfoStore, serviceStore, nil)
-	svc := service.NewToolBindingService(toolBindingStore, nil, mcpServerStore, serverBuildService)
+	serverBuildService := service.NewServerBuildService(mcpServerStore, toolStore, toolBindingStore, serverBuildInfoStore, serviceStore, nil)
+	svc := service.NewToolBindingService(toolBindingStore, toolStore, mcpServerStore, serverBuildService, db)
 
 	return &ToolBindingHandler{
 		service: svc,

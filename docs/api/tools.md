@@ -73,14 +73,16 @@
   "service_id": 1,
   "parameters": [],
   "input_mapping": [],
-  "enabled": true,
+  "state": 1,
   "output_mapping": []
 }
 ```
 
+**注意**: `state` 字段 - 1 表示正常状态，0 表示已删除（禁用）。
+
 ### DELETE /api/admin/tools/:id
 
-删除工具（软删除，仅禁用）。
+删除工具（软删除，将 state 设为 0）。
 
 **路径参数**:
 | 参数 | 类型 | 必填 | 说明 |

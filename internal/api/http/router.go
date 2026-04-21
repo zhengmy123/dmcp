@@ -12,6 +12,7 @@ import (
 	"dynamic_mcp_go_server/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // RegisterRoutes 注册所有路由
@@ -28,6 +29,7 @@ func RegisterRoutes(
 	serverBuildInfoStore repository.ServerBuildInfoStore,
 	jwtManager *auth.JWTManager,
 	log logger.Logger,
+	gormDB interface{},
 ) {
 	metadataHandler := service.NewHTTPHandler(registry)
 	scopedMCPHandler := service.NewScopedMCPHandler(groupManager)
@@ -89,7 +91,11 @@ func RegisterRoutes(
 
 		mcpGroup.GET("/http-services/:id/output-schema", toolHandler.GetHTTPServiceOutputSchema)
 
-		toolBindingHandler := mcp.NewToolBindingHandler(toolBindingStore, mcpServerStore, serverBuildInfoStore, serviceStore, log)
+		var db *gorm.DB
+		if gormDB != nil {
+			db = gormDB.(*gorm.DB)
+		}
+		toolBindingHandler := mcp.NewToolBindingHandler(toolBindingStore, mcpServerStore, toolStore, serverBuildInfoStore, serviceStore, log, db)
 		mcpGroup.GET("/tool-bindings/:toolId", toolBindingHandler.GetToolBindings)
 		mcpGroup.POST("/tool-bindings", toolBindingHandler.BindTool)
 		mcpGroup.DELETE("/tool-bindings/:toolId/:serverId", toolBindingHandler.UnbindTool)

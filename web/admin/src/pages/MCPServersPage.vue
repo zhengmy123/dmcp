@@ -109,7 +109,22 @@
               </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
-              <code class="text-sm text-gray-600 bg-gray-100 px-2 py-0.5 rounded">{{ server.vauth_key }}</code>
+              <div class="flex items-center">
+                <button
+                  @click="copyVAuthKey(server.vauth_key, server.id)"
+                  class="mr-1 p-1 rounded transition-colors"
+                  :class="copiedId === server.id ? 'text-green-600' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'"
+                  title="复制 VAuth Key"
+                >
+                  <svg v-if="copiedId !== server.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                  </svg>
+                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                  </svg>
+                </button>
+                <code class="text-sm text-gray-600 bg-gray-100 px-2 py-0.5 rounded">{{ server.vauth_key }}</code>
+              </div>
             </td>
             <td class="px-6 py-4 whitespace-nowrap">
               <span class="px-2.5 py-1 text-xs font-medium bg-blue-100 text-blue-700 rounded-full">
@@ -128,19 +143,17 @@
               <span class="text-sm text-gray-500 line-clamp-1">{{ server.description || '无描述' }}</span>
             </td>
             <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
-              <div class="flex items-center justify-end space-x-1">
+              <div class="flex items-center justify-end space-x-2">
                 <button
                   @click="openBindingDialog(server)"
-                  class="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  class="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-blue-100 text-blue-700 hover:bg-blue-200"
                   title="管理工具"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
-                  </svg>
+                  管理工具
                 </button>
                 <button
                   @click="openEditModal(server)"
-                  class="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                  class="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                   title="编辑"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,7 +163,7 @@
                 <button
                   v-if="server.state === 1"
                   @click="handleDelete(server)"
-                  class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   title="删除"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -160,7 +173,7 @@
                 <button
                   v-else
                   @click="handleRestore(server)"
-                  class="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                  class="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
                   title="启用"
                 >
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -198,11 +211,21 @@
                       placeholder="MCP Server 名称">
                   </div>
 
+                  <div v-if="!editingServer">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">类型 *</label>
+                    <select v-model="form.type" required
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500">
+                      <option value="http_service">HTTP Service</option>
+                      <option value="proxy">MCP Proxy</option>
+                    </select>
+                    <p class="text-xs text-gray-400 mt-1">创建后不可修改</p>
+                  </div>
+
                   <div v-if="editingServer">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">VAuth Key</label>
-                    <input v-model="form.vauth_key" type="text" disabled
+                    <label class="block text-sm font-medium text-gray-700 mb-1">类型</label>
+                    <input :value="form.type === 'http_service' ? 'HTTP Service' : 'MCP Proxy'" type="text" disabled
                       class="w-full px-3 py-2 border border-gray-200 bg-gray-50 rounded-lg text-gray-500">
-                    <p class="text-xs text-gray-400 mt-1">唯一标识，创建后不可修改</p>
+                    <p class="text-xs text-gray-400 mt-1">创建后不可修改</p>
                   </div>
 
                   <div>
@@ -212,12 +235,36 @@
                       placeholder="可选描述信息"></textarea>
                   </div>
 
-                  <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">HTTP 服务 URL</label>
+                  <div v-if="form.type === 'proxy'">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">代理地址</label>
                     <input v-model="form.http_server_url" type="url"
                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                       placeholder="https://api.example.com/mcp">
-                    <p class="text-xs text-gray-400 mt-1">可选，连接外部 MCP Server</p>
+                    <p class="text-xs text-gray-400 mt-1">MCP 代理服务地址</p>
+                  </div>
+
+                  <div v-if="form.type === 'proxy'">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">认证 Header</label>
+                    <input v-model="form.auth_header" type="text"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="Authorization: Bearer xxx">
+                    <p class="text-xs text-gray-400 mt-1">可选，代理认证信息</p>
+                  </div>
+
+                  <div v-if="form.type === 'proxy'">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">超时时间（秒）</label>
+                    <input v-model.number="form.timeout_seconds" type="number" min="1" max="300"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="30">
+                    <p class="text-xs text-gray-400 mt-1">请求超时时间，默认 30 秒</p>
+                  </div>
+
+                  <div v-if="form.type === 'proxy'">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">额外 Headers</label>
+                    <textarea v-model="form.extra_headers" rows="2"
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                      placeholder="X-Custom-Header: value"></textarea>
+                    <p class="text-xs text-gray-400 mt-1">可选，JSON 格式额外请求头</p>
                   </div>
 
                   <div class="flex justify-end space-x-3 pt-4">
@@ -263,6 +310,19 @@ const editingServer = ref(null)
 const showBindingDialog = ref(false)
 const selectedServerForBinding = ref(null)
 const confirmDialog = ref(null)
+const copiedId = ref(null)
+
+const copyVAuthKey = async (text, id) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    copiedId.value = id
+    setTimeout(() => {
+      copiedId.value = null
+    }, 1500)
+  } catch (e) {
+    console.error('复制失败:', e)
+  }
+}
 
 const searchForm = reactive({
   name: '',
@@ -284,9 +344,13 @@ const handleReset = () => {
 
 const form = reactive({
   name: '',
+  type: 'http_service',
   vauth_key: '',
   description: '',
-  http_server_url: ''
+  http_server_url: '',
+  auth_header: '',
+  timeout_seconds: 30,
+  extra_headers: ''
 })
 
 const openBindingDialog = (server) => {
@@ -302,9 +366,13 @@ const openCreateModal = () => {
   editingServer.value = null
   Object.assign(form, {
     name: '',
+    type: 'http_service',
     vauth_key: '',
     description: '',
-    http_server_url: ''
+    http_server_url: '',
+    auth_header: '',
+    timeout_seconds: 30,
+    extra_headers: ''
   })
   showModal.value = true
 }
@@ -313,9 +381,13 @@ const openEditModal = (server) => {
   editingServer.value = server
   Object.assign(form, {
     name: server.name,
+    type: server.type || 'http_service',
     vauth_key: server.vauth_key,
     description: server.description || '',
-    http_server_url: server.http_server_url || ''
+    http_server_url: server.http_server_url || '',
+    auth_header: server.auth_header || '',
+    timeout_seconds: server.timeout_seconds || 30,
+    extra_headers: server.extra_headers || ''
   })
   showModal.value = true
 }
@@ -323,9 +395,11 @@ const openEditModal = (server) => {
 const handleSubmit = async () => {
   try {
     if (editingServer.value) {
-      await mcpServersStore.updateServer(editingServer.value.id, { ...form })
+      const { type, vauth_key, ...updateData } = form
+      await mcpServersStore.updateServer(editingServer.value.id, updateData)
     } else {
-      await mcpServersStore.createServer({ ...form })
+      const { vauth_key, ...createData } = form
+      await mcpServersStore.createServer(createData)
     }
     showModal.value = false
   } catch (e) {

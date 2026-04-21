@@ -1,63 +1,40 @@
 services:
-  mysql:
-    image: mysql:8.0
-    container_name: mcp-mysql
+  mcp-server:
+    image: golang:1.25-alpine
+    container_name: mcp-server
     restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: 1234qwer
-      MYSQL_DATABASE: mcp_server
-      MYSQL_USER: mcp_user
-      MYSQL_PASSWORD: mcp_pass
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --character-set-client-handshake=FALSE
+    working_dir: /app
     ports:
-      - "3306:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./docs/mysql_migration.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - "17050:18080"
+    environment:
+      MYSQL_DSN: "root:1234qwer@tcp(host.docker.internal:3306)/mcp_server?charset=utf8mb4&parseTime=True&loc=Local"
+      HTTP_MYSQL_DSN: "root:1234qwer@tcp(host.docker.internal:3306)/mcp_server?charset=utf8mb4&parseTime=True&loc=Local"
+      REDIS_ADDR: "host.docker.internal:6379"
+      TOOL_STORE: "mysql"
+      HTTP_SERVICE_STORE: "mysql"
+      ADMIN_TOKEN: "admin-secret-token"
+      REFRESH_SECONDS: 10
+      HTTP_SYNC_INTERVAL: 60
+      GOCACHE: /go-build-cache
+      GOMODCACHE: /go-mod-cache
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-p1234qwer"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:18080/health"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 60s
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+      - go-mod-cache:/go-mod-cache
+      - go-build-cache:/go-build-cache
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    tty: true
+    stdin_open: true
+    command: sh -c "echo '[mcp-server] Downloading dependencies...' && go mod download && echo '[mcp-server] Building server...' && go build -o mcp-server ./cmd/server && echo '[mcp-server] Starting server...' && ./mcp-server"
     networks:
       - mcp-network
-
-  # mcp-server:
-  #   image: golang:1.25-alpine
-  #   container_name: mcp-server
-  #   restart: unless-stopped
-  #   working_dir: /app
-  #   ports:
-  #     - "17050:18080"
-  #   environment:
-  #     MYSQL_DSN: "root:1234qwer@tcp(mysql:3306)/mcp_server?charset=utf8mb4&parseTime=True&loc=Local"
-  #     HTTP_MYSQL_DSN: "root:1234qwer@tcp(mysql:3306)/mcp_server?charset=utf8mb4&parseTime=True&loc=Local"
-  #     TOOL_STORE: "mysql"
-  #     HTTP_SERVICE_STORE: "mysql"
-  #     ADMIN_TOKEN: "admin-secret-token"
-  #     REFRESH_SECONDS: 10
-  #     HTTP_SYNC_INTERVAL: 60
-  #     GOCACHE: /go-build-cache
-  #     GOMODCACHE: /go-mod-cache
-  #   depends_on:
-  #     mysql:
-  #       condition: service_healthy
-  #   healthcheck:
-  #     test: ["CMD", "wget", "-q", "--spider", "http://localhost:18080/health"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 10
-  #     start_period: 60s
-  #   volumes:
-  #     - .:/app
-  #     - ./logs:/app/logs
-  #     - go-mod-cache:/go-mod-cache
-  #     - go-build-cache:/go-build-cache
-  #   tty: true        # 开启伪终端
-  #   stdin_open: true # 保持打开
-  #   command: sh -c "echo '[mcp-server] Downloading dependencies...' && go mod download && echo '[mcp-server] Building server...' && go build -o mcp-server ./cmd/server && echo '[mcp-server] Starting server...' && ./mcp-server"
-  #   networks:
-  #     - mcp-network
 
   web:
     image: nginx:alpine
@@ -72,7 +49,6 @@ services:
       - mcp-network
 
 volumes:
-  mysql_data:
   go-mod-cache:
   go-build-cache:
 

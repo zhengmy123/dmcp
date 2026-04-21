@@ -51,8 +51,8 @@ func (d *GORMToolStore) List(ctx context.Context, query *repository.ToolQuery, p
 		if query.ServiceID != nil {
 			db = db.Where("service_id = ?", *query.ServiceID)
 		}
-		if query.Enabled != nil {
-			db = db.Where("enabled = ?", *query.Enabled)
+		if query.State != nil {
+			db = db.Where("state = ?", *query.State)
 		}
 		if query.Keyword != nil && *query.Keyword != "" {
 			db = db.Where("name LIKE ?", "%"+*query.Keyword+"%")
@@ -97,7 +97,7 @@ func (d *GORMToolStore) DeleteTool(ctx context.Context, id uint) error {
 }
 
 func (d *GORMToolStore) Delete(ctx context.Context, id uint) error {
-	result := d.db.WithContext(ctx).Model(&model.ToolDefinition{}).Where("id = ?", id).Update("enabled", false)
+	result := d.db.WithContext(ctx).Model(&model.ToolDefinition{}).Where("id = ?", id).Update("state", 0)
 	if result.Error != nil {
 		return result.Error
 	}

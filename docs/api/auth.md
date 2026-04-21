@@ -28,7 +28,7 @@
       "name": "Admin",
       "email": "admin@example.com",
       "role": "admin",
-      "enabled": true,
+    "state": 1,
       "last_login_at": "2024-01-01T00:00:00Z",
       "created_at": "2024-01-01T00:00:00Z",
       "updated_at": "2024-01-01T00:00:00Z"
@@ -55,7 +55,7 @@
       "name": "Admin",
       "email": "admin@example.com",
       "role": "admin",
-      "enabled": true
+      "state": 1
     }
   }
 }
@@ -125,7 +125,7 @@
   "name": "string",
   "email": "string",
   "role": "admin|user",
-  "enabled": true
+  "state": 1
 }
 ```
 

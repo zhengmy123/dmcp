@@ -8,10 +8,13 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
-// 日志级别环境变量名
-const EnvLogLevel = "LOG_LEVEL"
+const (
+	EnvLogLevel    = "LOG_LEVEL"
+	DefaultMaxSize = 1 << 30 // 1GB
+)
 
 // NewFileLogger 创建文件+标准输出的 Logger
 func NewFileLogger(logDir, logFileName string) (Logger, func() error, error) {
@@ -55,9 +58,11 @@ func newFileLoggerWithStdoutWriter(logDir, logFileName string, stdoutWriter io.W
 		return nil, nil, err
 	}
 
-	logFile, err := os.OpenFile(filepath.Join(logDir, logFileName), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if err != nil {
-		return nil, nil, err
+	rotateLogger := &lumberjack.Logger{
+		Filename:   filepath.Join(logDir, logFileName),
+		MaxSize:    DefaultMaxSize,
+		MaxBackups: 0,
+		Compress:   false,
 	}
 
 	encoderCfg := zap.NewProductionEncoderConfig()
@@ -72,7 +77,7 @@ func newFileLoggerWithStdoutWriter(logDir, logFileName string, stdoutWriter io.W
 	core := zapcore.NewCore(
 		zapcore.NewJSONEncoder(encoderCfg),
 		zapcore.NewMultiWriteSyncer(
-			zapcore.AddSync(logFile),
+			zapcore.AddSync(rotateLogger),
 			zapcore.AddSync(stdoutWriter),
 		),
 		level,
@@ -80,11 +85,8 @@ func newFileLoggerWithStdoutWriter(logDir, logFileName string, stdoutWriter io.W
 	z := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.ErrorLevel))
 
 	cleanup := func() error {
-		if err := z.Sync(); err != nil {
-			_ = logFile.Close()
-			return err
-		}
-		return logFile.Close()
+		_ = z.Sync()
+		return rotateLogger.Close()
 	}
 
 	return &ZapLogger{zap: z}, cleanup, nil

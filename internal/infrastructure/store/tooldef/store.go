@@ -24,7 +24,7 @@ func NewMemoryStore(definitions []model.ToolDefinition) *MemoryStore {
 func (m *MemoryStore) List(context.Context) ([]model.ToolDefinition, error) {
 	out := make([]model.ToolDefinition, 0, len(m.definitions))
 	for _, def := range m.definitions {
-		if !def.Enabled {
+		if def.State != 1 {
 			continue
 		}
 		out = append(out, def)

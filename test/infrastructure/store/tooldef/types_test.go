@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"dynamic_mcp_go_server/internal/domain/model"
+	"dynamic_mcp_go_server/internal/infrastructure/store/tooldef"
 )
 
 func TestParseToolDefinitionsFromRedisData(t *testing.T) {
@@ -15,11 +16,11 @@ func TestParseToolDefinitionsFromRedisData(t *testing.T) {
     "parameters": [
       {"name":"query","type":"string","required":true}
     ],
-    "enabled": true
+    "state": 1
   }
 ]`)
 
-	defs, err := model.ParseToolDefinitions(raw)
+	defs, err := tooldef.ParseToolDefinitions(raw)
 	if err != nil {
 		t.Fatalf("parse failed: %v", err)
 	}
@@ -44,11 +45,11 @@ func TestParseToolDefinitionsRequiresName(t *testing.T) {
   {
     "description": "x",
     "parameters": [],
-    "enabled": true
+    "state": 1
   }
 ]`)
 
-	if _, err := model.ParseToolDefinitions(raw); err == nil {
+	if _, err := tooldef.ParseToolDefinitions(raw); err == nil {
 		t.Fatalf("expected error when name is missing")
 	}
 }
@@ -62,8 +63,8 @@ func TestParseToolDefinitionsRequiresEnabledField(t *testing.T) {
   }
 ]`)
 
-	if _, err := model.ParseToolDefinitions(raw); err == nil {
-		t.Fatalf("expected error when enabled is missing")
+	if _, err := tooldef.ParseToolDefinitions(raw); err == nil {
+		t.Fatalf("expected error when state is missing")
 	}
 }
 
@@ -73,12 +74,12 @@ func TestParseToolDefinitionsRejectsEnabledFalse(t *testing.T) {
     "name": "search_users",
     "description": "Search users",
     "parameters": [],
-    "enabled": false
+    "state": 0
   }
 ]`)
 
-	if _, err := model.ParseToolDefinitions(raw); err == nil {
-		t.Fatalf("expected error when enabled is false")
+	if _, err := tooldef.ParseToolDefinitions(raw); err == nil {
+		t.Fatalf("expected error when state is 0")
 	}
 }
 
@@ -116,5 +117,29 @@ func TestParameterDefinitionSerialization(t *testing.T) {
 	}
 	if parsed[1].Name != "limit" || parsed[1].Required != false {
 		t.Fatalf("unexpected second parameter: %+v", parsed[1])
+	}
+}
+
+func TestValidateToolName(t *testing.T) {
+	tests := []struct {
+		name    string
+		wantErr bool
+	}{
+		{"valid_tool", false},
+		{"valid-tool", false},
+		{"valid.tool", false},
+		{"valid_tool_123", false},
+		{"", true},
+		{"tool with space", true},
+		{"tool@special", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tooldef.ValidateToolName(tt.name)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateToolName() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"dynamic_mcp_go_server/internal/domain/model"
@@ -13,6 +14,11 @@ import (
 // GORMMCPServerDAO GORM实现的MCP服务器DAO
 type GORMMCPServerDAO struct {
 	db *gorm.DB
+}
+
+// DB 获取数据库连接
+func (d *GORMMCPServerDAO) DB() *gorm.DB {
+	return d.db
 }
 
 // NewGORMMCPServerDAO 创建GORM MCP服务器DAO
@@ -130,8 +136,23 @@ func (d *GORMMCPServerDAO) GetByVAuthKey(ctx context.Context, vauthKey string) (
 
 	result := d.db.WithContext(ctx).Where("v_auth_key = ? AND state = ?", vauthKey, 1).First(&server)
 	if result.Error != nil {
-		if result.Error == gorm.ErrRecordNotFound {
-			return nil, fmt.Errorf("mcp server not found")
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, gorm.ErrRecordNotFound
+		}
+		return nil, result.Error
+	}
+
+	return &server, nil
+}
+
+// GetByName 根据名称获取 MCP 服务器
+func (d *GORMMCPServerDAO) GetByName(ctx context.Context, name string) (*model.MCPServer, error) {
+	var server model.MCPServer
+
+	result := d.db.WithContext(ctx).Where("name = ? AND state = ?", name, 1).First(&server)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+			return nil, gorm.ErrRecordNotFound
 		}
 		return nil, result.Error
 	}
@@ -180,4 +201,12 @@ func (d *GORMMCPServerDAO) Restore(ctx context.Context, id uint) error {
 		return fmt.Errorf("mcp server not found or already active: %d", id)
 	}
 	return nil
+}
+
+// SaveWithTx 在事务中保存 MCP 服务器
+func (d *GORMMCPServerDAO) SaveWithTx(ctx context.Context, tx *gorm.DB, server *model.MCPServer) error {
+	if server.ID == 0 {
+		return tx.Create(server).Error
+	}
+	return tx.Save(server).Error
 }

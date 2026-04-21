@@ -1,6 +1,6 @@
 export const TokenStatus = {
-  ENABLED: 'enabled',
-  DISABLED: 'disabled'
+  ENABLED: 1,
+  DISABLED: 0
 }
 
 export const HTTPMethod = {

@@ -145,7 +145,7 @@
                       <div class="flex-1 min-w-0">
                         <div class="flex items-center gap-2">
                           <p class="text-sm font-medium text-gray-900 truncate">{{ binding.server?.name || 'Unknown' }}</p>
-                          <span v-if="binding.server?.enabled" class="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0"></span>
+                          <span v-if="binding.server?.state === 1" class="w-1.5 h-1.5 bg-green-500 rounded-full flex-shrink-0"></span>
                           <span v-else class="w-1.5 h-1.5 bg-gray-300 rounded-full flex-shrink-0"></span>
                         </div>
                         <p class="text-xs text-gray-400 truncate mt-0.5">{{ binding.server?.description || '暂无描述' }}</p>
