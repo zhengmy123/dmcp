@@ -196,6 +196,13 @@
                   管理工具
                 </button>
                 <button
+                  @click="openDebugDialog(server)"
+                  class="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-purple-100 text-purple-700 hover:bg-purple-200"
+                  title="调试"
+                >
+                  调试
+                </button>
+                <button
                   @click="openEditModal(server)"
                   class="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                   title="编辑"
@@ -429,6 +436,13 @@
       @close="showBindingDialog = false"
     />
 
+    <!-- MCP Debug Dialog -->
+    <MCPDebugDialog
+      :visible="showDebugDialog"
+      :server="selectedServerForDebug"
+      @close="showDebugDialog = false"
+    />
+
     <!-- Confirm Dialog -->
     <ConfirmDialog ref="confirmDialog" />
   </div>
@@ -438,6 +452,7 @@
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useMCPServersStore } from '@/stores/mcpServers'
 import ServerBindingDialog from '@/components/ServerBindingDialog.vue'
+import MCPDebugDialog from '@/components/MCPDebugDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { systemConfigApi } from '@/api/systemConfig'
 
@@ -450,6 +465,8 @@ const showModal = ref(false)
 const editingServer = ref(null)
 const showBindingDialog = ref(false)
 const selectedServerForBinding = ref(null)
+const showDebugDialog = ref(false)
+const selectedServerForDebug = ref(null)
 const confirmDialog = ref(null)
 const copiedId = ref(null)
 const copiedVauthId = ref(null)
@@ -642,6 +659,11 @@ watch(headersList, () => {
 const openBindingDialog = (server) => {
   selectedServerForBinding.value = server
   showBindingDialog.value = true
+}
+
+const openDebugDialog = (server) => {
+  selectedServerForDebug.value = server
+  showDebugDialog.value = true
 }
 
 const refreshServers = () => {
