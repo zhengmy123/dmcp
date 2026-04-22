@@ -33,6 +33,13 @@ docker exec -i mcp-mysql mysql -uroot -p1234qwer < docs/mysql_migration.sql 2>/d
 docker exec -i mcp-mysql sh -c 'mysql -uroot -p1234qwer' < docs/mysql_migration.sql
 echo "数据库迁移完成"
 
+# 创建管理员用户
+echo ""
+echo "初始化管理员用户..."
+cd scripts/init && go run init_user.go
+cd ../..
+echo "管理员用户初始化完成"
+
 # 检查 web/admin/dist 是否存在
 echo ""
 if [ ! -d "web/admin/dist" ]; then

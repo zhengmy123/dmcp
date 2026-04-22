@@ -11,7 +11,7 @@
             </svg>
           </div>
           <div>
-            <h1 class="text-lg font-semibold text-gray-900">MCP Server</h1>
+            <h1 class="text-lg font-semibold text-gray-900">DMCP</h1>
             <p class="text-xs text-gray-500">管理后台</p>
           </div>
         </div>
@@ -215,7 +215,7 @@ const navItems = [
   },
   {
     path: '/mcp-servers',
-    title: 'MCP Server',
+    title: 'MCP Servers',
     icon: h('svg', { class: 'w-5 h-5', fill: 'none', stroke: 'currentColor', viewBox: '0 0 24 24' }, [
       h('path', { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01' })
     ])

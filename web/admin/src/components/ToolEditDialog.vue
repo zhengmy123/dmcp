@@ -98,14 +98,29 @@
                   </h4>
                   <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">HTTP 服务 *</label>
-                    <select v-model="form.service_id" required
-                      class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                      @change="onServiceChange">
-                      <option :value="0">选择服务</option>
-                      <option v-for="service in services" :key="service.id" :value="service.id">
-                        {{ service.name }}
-                      </option>
-                    </select>
+                    <div class="flex items-center gap-2">
+                      <select v-model="form.service_id" required
+                        class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                        @change="onServiceChange">
+                        <option :value="0">选择服务</option>
+                        <option v-for="service in services" :key="service.id" :value="service.id">
+                          {{ service.name }}
+                        </option>
+                      </select>
+                      <button
+                        type="button"
+                        @click="handleSyncService"
+                        :disabled="!form.service_id || syncing"
+                        class="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-1.5"
+                        title="同步服务 Schema"
+                      >
+                        <svg class="w-4 h-4" :class="{ 'animate-spin': syncing }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                        {{ syncing ? '同步中...' : '同步' }}
+                      </button>
+                    </div>
+                    <p v-if="lastSyncedAt" class="mt-1 text-xs text-gray-400">上次同步: {{ lastSyncedAt }}</p>
                   </div>
                 </div>
 
@@ -421,6 +436,8 @@ const prevNames = ref({})
 
 const DRAFT_CACHE_KEY = 'tool_edit_draft'
 const hasDraft = ref(false)
+const syncing = ref(false)
+const lastSyncedAt = ref('')
 
 const TOOL_NAME_PATTERN = /^[a-zA-Z0-9_.-]{1,64}$/
 const TOOL_NAME_MAX_LENGTH = 64
@@ -610,9 +627,8 @@ const initForm = async (tool) => {
       }
     })
 
-    if (form.service_id) {
-      await loadServiceSchemas(form.service_id)
-    }
+    // 编辑模式下：使用工具已有的数据，不自动从服务获取
+    // 只有用户点击"同步"按钮时，才从服务获取最新 Schema 覆盖
   } else {
     resetForm()
   }
@@ -684,24 +700,49 @@ watch([() => form, inputParams, inputMappings, outputMappings, deletedInputField
 
 const onServiceChange = async () => {
   if (form.service_id) {
-    // 拉取完整服务信息
-    try {
-      const response = await servicesApi.getService(form.service_id)
-      // request.js 的响应拦截器返回 resData: { code, message, data: { service } }
-      const service = response.data?.service || response.data || response
-
-      // 同步入参
-      syncInputFromService(service)
-
-      // 同步出参字段
-      syncOutputFromService(service)
-    } catch (error) {
-      console.error('获取服务信息失败:', error)
+    // 编辑模式下，等待用户点击"同步"按钮获取最新数据
+    // 新建模式下，选择服务时自动同步（无现有数据需要保留）
+    if (!editingTool.value) {
+      try {
+        const response = await servicesApi.getService(form.service_id)
+        const service = response.data?.service || response.data || response
+        syncInputFromService(service)
+        syncOutputFromService(service)
+      } catch (error) {
+        console.error('获取服务信息失败:', error)
+      }
     }
   } else {
     // 清空 outputSchemaFields
     outputSchemaFields.value = []
     outputSchemaTree.value = []
+    inputParams.value = []
+    inputMappings.value = []
+    inputSchemaFields.value = []
+    inputSchemaTree.value = []
+  }
+}
+
+const handleSyncService = async () => {
+  if (!form.service_id || syncing.value) return
+
+  syncing.value = true
+  try {
+    const response = await servicesApi.getService(form.service_id)
+    const service = response.data?.service || response.data || response
+
+    syncInputFromService(service, false)
+    syncOutputFromService(service)
+
+    lastSyncedAt.value = new Date().toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  } catch (error) {
+    console.error('同步服务失败:', error)
+  } finally {
+    syncing.value = false
   }
 }
 

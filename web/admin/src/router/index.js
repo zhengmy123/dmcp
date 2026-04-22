@@ -64,7 +64,7 @@ const router = createRouter({
 // 路由守卫
 router.beforeEach((to, from, next) => {
   NProgress.start()
-  document.title = `${to.meta.title || 'MCP Admin'} - MCP Server`
+  document.title = `${to.meta.title || 'DMCP Admin'} - DMCP`
 
   // 检查是否需要认证
   if (to.meta.requiresAuth !== false) {
