@@ -30,6 +30,9 @@ __debug_bin*
 web/admin/dist
 web/admin/node_modules.worktrees/
 
+# docs
+docs/
+
 
 # node_modules
 node_modules
