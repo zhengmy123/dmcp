@@ -183,21 +183,21 @@
                 <button
                   v-if="server.state === 1"
                   @click="handleSyncBuild(server)"
-                  class="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-green-100 text-green-700 hover:bg-green-200"
+                  class="px-3 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer bg-green-100 text-green-700 hover:bg-green-200 active:bg-green-300"
                   title="同步构建信息"
                 >
                   同步构建
                 </button>
                 <button
                   @click="openBindingDialog(server)"
-                  class="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-blue-100 text-blue-700 hover:bg-blue-200"
+                  class="px-3 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer bg-blue-100 text-blue-700 hover:bg-blue-200 active:bg-blue-300"
                   title="管理工具"
                 >
                   管理工具
                 </button>
                 <button
                   @click="openDebugDialog(server)"
-                  class="px-3 py-1 text-xs font-medium rounded-lg transition-colors bg-purple-100 text-purple-700 hover:bg-purple-200"
+                  class="px-3 py-1 text-xs font-medium rounded-lg transition-colors cursor-pointer bg-purple-100 text-purple-700 hover:bg-purple-200 active:bg-purple-300"
                   title="调试"
                 >
                   调试

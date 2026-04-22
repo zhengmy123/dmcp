@@ -1472,11 +1472,12 @@ const runDebug = async () => {
 
   debugLoading.value = true
   try {
-    const result = await servicesApi.debugService(debugService.value.id, {
+    const res = await servicesApi.debugService(debugService.value.id, {
       headers,
       body,
       body_type: debugBodyType.value,
     })
+    const result = res.data?.response || res.data || res
     debugResult.value = result
     if (result.success) {
       showToast('请求成功', 'success')
