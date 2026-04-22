@@ -169,6 +169,23 @@ CREATE TABLE IF NOT EXISTS `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
 
 -- ============================================
+-- 步骤8: 创建 system_configs 表（系统配置表）
+-- ============================================
+CREATE TABLE IF NOT EXISTS `system_configs` (
+    `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+    `config_key` VARCHAR(64) NOT NULL COMMENT '配置键',
+    `config_value` TEXT COMMENT '配置值',
+    `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_config_key` (`config_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='系统配置表';
+
+-- 初始化默认配置
+INSERT INTO `system_configs` (`config_key`, `config_value`) VALUES ('api_host', 'http://localhost:18080')
+ON DUPLICATE KEY UPDATE `config_value` = VALUES(`config_value`);
+
+-- ============================================
 -- 完成
 -- ============================================
 SELECT 'Migration completed successfully!' AS status;

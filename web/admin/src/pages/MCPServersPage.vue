@@ -142,12 +142,25 @@
             <td class="px-6 py-4 whitespace-nowrap">
               <div class="flex items-center">
                 <button
-                  @click="copyVAuthKey(server.vauth_key, server.id)"
+                  @click="copyMcpUrl(server)"
                   class="mr-1 p-1 rounded transition-colors"
                   :class="copiedId === server.id ? 'text-green-600' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'"
-                  title="复制 VAuth Key"
+                  title="复制 MCP 请求地址"
                 >
                   <svg v-if="copiedId !== server.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                  </svg>
+                  <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                  </svg>
+                </button>
+                <button
+                  @click="copyVAuthKey(server.vauth_key, server.id)"
+                  class="mr-1 p-1 rounded transition-colors"
+                  :class="copiedVauthId === server.id ? 'text-green-600' : 'text-gray-400 hover:text-primary-600 hover:bg-primary-50'"
+                  title="复制 VAuth Key"
+                >
+                  <svg v-if="copiedVauthId !== server.id" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                   </svg>
                   <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -426,8 +439,12 @@ import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useMCPServersStore } from '@/stores/mcpServers'
 import ServerBindingDialog from '@/components/ServerBindingDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import { systemConfigApi } from '@/api/systemConfig'
 
 const mcpServersStore = useMCPServersStore()
+
+const API_HOST_KEY = 'api_host'
+const mcpServerUrl = ref('')
 
 const showModal = ref(false)
 const editingServer = ref(null)
@@ -435,11 +452,42 @@ const showBindingDialog = ref(false)
 const selectedServerForBinding = ref(null)
 const confirmDialog = ref(null)
 const copiedId = ref(null)
+const copiedVauthId = ref(null)
 
 const copyVAuthKey = async (text, id) => {
   try {
     await navigator.clipboard.writeText(text)
-    copiedId.value = id
+    copiedVauthId.value = id
+    setTimeout(() => {
+      copiedVauthId.value = null
+    }, 1500)
+  } catch (e) {
+    console.error('复制失败:', e)
+  }
+}
+
+const loadMcpServerUrl = async () => {
+  try {
+    const res = await systemConfigApi.getConfig(API_HOST_KEY)
+    if (res.data && res.data.config_value) {
+      mcpServerUrl.value = res.data.config_value
+    }
+  } catch (e) {
+    console.error('failed to load mcp server url:', e)
+  }
+}
+
+const getFullMcpUrl = (vauthKey) => {
+  if (!mcpServerUrl.value || !vauthKey) return ''
+  return mcpServerUrl.value.replace(/\/$/, '') + '/mcp/' + vauthKey
+}
+
+const copyMcpUrl = async (server) => {
+  const url = getFullMcpUrl(server.vauth_key)
+  if (!url) return
+  try {
+    await navigator.clipboard.writeText(url)
+    copiedId.value = server.id
     setTimeout(() => {
       copiedId.value = null
     }, 1500)
@@ -715,6 +763,7 @@ const handleSyncBuild = async (server) => {
 }
 
 onMounted(() => {
+  loadMcpServerUrl()
   mcpServersStore.fetchServers({
     page: 1,
     page_size: 10

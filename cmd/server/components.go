@@ -12,6 +12,7 @@ import (
 	"dynamic_mcp_go_server/internal/infrastructure/auth"
 	"dynamic_mcp_go_server/internal/infrastructure/database"
 	"dynamic_mcp_go_server/internal/infrastructure/store/httpservice"
+	"dynamic_mcp_go_server/internal/infrastructure/store/systemconfig"
 	"dynamic_mcp_go_server/internal/infrastructure/store/tooldef"
 	"dynamic_mcp_go_server/internal/service"
 
@@ -37,6 +38,7 @@ type ServerComponents struct {
 	BuildService     *service.ServerBuildService
 	ToolDefStore     tooldef.Store
 	GORMDB           *gorm.DB
+	SystemConfigStore repository.SystemConfigStore
 }
 
 func newServerComponents(cfg config.Config) (*ServerComponents, func(), error) {
@@ -65,6 +67,7 @@ func newServerComponents(cfg config.Config) (*ServerComponents, func(), error) {
 			comp.ToolBindingStore = database.NewGORMToolServerBindingDAO(gormDB)
 			comp.BuildInfoStore = database.NewGORMServerBuildInfoDAO(gormDB)
 			comp.ToolDefStore = tooldef.NewEnhancedMySQLStore(gormDB, cfg.MySQLTable, appLogger)
+			comp.SystemConfigStore = systemconfig.NewGORMSystemConfigStore(gormDB)
 		}
 	}
 

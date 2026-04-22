@@ -1,9 +1,9 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
-import { API_BASE_URL, SERVER_URL_KEY, JWT_TOKEN_KEY } from '@/types'
+import { JWT_TOKEN_KEY } from '@/types'
 
 const getBaseURL = () => {
-  return localStorage.getItem(SERVER_URL_KEY) || API_BASE_URL
+  return window.APP_CONFIG?.apiBaseUrl || 'http://localhost:17050'
 }
 
 const getJWTToken = () => {
@@ -18,6 +18,7 @@ const createRequest = () => {
 
   instance.interceptors.request.use(
     (config) => {
+      config.baseURL = getBaseURL()
       const jwtToken = getJWTToken()
       if (jwtToken) {
         config.headers['Authorization'] = `Bearer ${jwtToken}`

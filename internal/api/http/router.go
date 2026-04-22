@@ -31,6 +31,7 @@ func RegisterRoutes(
 	jwtManager *auth.JWTManager,
 	log logger.Logger,
 	gormDB interface{},
+	systemConfigStore repository.SystemConfigStore,
 ) {
 	metadataHandler := service.NewHTTPHandler(registry)
 	scopedMCPHandler := service.NewScopedMCPHandler(groupManager, proxyHandler)
@@ -105,6 +106,15 @@ func RegisterRoutes(
 		mcpGroup.POST("/tool-bindings/batch-bind", toolBindingHandler.BatchBind)
 		mcpGroup.DELETE("/tool-bindings/batch-unbind", toolBindingHandler.BatchUnbind)
 		mcpGroup.GET("/server-bindings/:serverId", toolBindingHandler.GetServerBindings)
+	}
+
+	if jwtManager != nil && systemConfigStore != nil {
+		systemConfigService := service.NewSystemConfigService(systemConfigStore)
+		systemConfigHandler := handler.NewSystemConfigHandler(systemConfigService)
+		systemGroup := e.Group("/api/v1/system")
+		systemGroup.Use(apimw.JWTAuth(jwtManager))
+		systemGroup.GET("/config/:key", systemConfigHandler.GetConfig)
+		systemGroup.PUT("/config/:key", systemConfigHandler.UpdateConfig)
 	}
 }
 

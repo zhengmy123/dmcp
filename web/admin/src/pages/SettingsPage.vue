@@ -1,39 +1,31 @@
 <template>
   <div class="max-w-3xl space-y-6">
-    <!-- Header -->
     <div>
       <h2 class="text-lg font-semibold text-gray-900">系统设置</h2>
       <p class="text-sm text-gray-500 mt-1">配置 MCP Server 连接参数</p>
     </div>
 
-    <!-- API Configuration -->
     <div class="bg-white rounded-xl border border-gray-200">
       <div class="px-6 py-4 border-b border-gray-200">
         <h3 class="font-semibold text-gray-900">API 配置</h3>
       </div>
       <div class="p-6 space-y-4">
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">服务地址</label>
-          <input
-            v-model="settings.serverUrl"
-            type="url"
-            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            placeholder="http://localhost:18080"
-          >
-          <p class="text-xs text-gray-500 mt-1">MCP Server 的访问地址</p>
-        </div>
-        <div class="flex justify-end">
-          <button
-            @click="saveApiSettings"
-            class="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700"
-          >
-            保存
-          </button>
+          <label class="block text-sm font-medium text-gray-700 mb-1">MCP Server 地址</label>
+          <div class="flex items-center gap-2">
+            <input
+              v-model="mcpServerUrl"
+              type="url"
+              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+              placeholder="http://localhost:17050"
+              @blur="saveMcpServerUrl"
+            >
+          </div>
+          <p class="text-xs text-gray-500 mt-1">后端暴露的 MCP Server 访问地址（失焦后自动保存）</p>
         </div>
       </div>
     </div>
 
-    <!-- Connection Info -->
     <div class="bg-white rounded-xl border border-gray-200">
       <div class="px-6 py-4 border-b border-gray-200">
         <h3 class="font-semibold text-gray-900">数据库连接</h3>
@@ -60,7 +52,6 @@
       </div>
     </div>
 
-    <!-- About -->
     <div class="bg-white rounded-xl border border-gray-200">
       <div class="px-6 py-4 border-b border-gray-200">
         <h3 class="font-semibold text-gray-900">关于</h3>
@@ -84,22 +75,40 @@
 </template>
 
 <script setup>
-import { reactive, inject, onMounted } from 'vue'
-import { useAuthStore } from '@/stores/auth'
+import { ref, onMounted } from 'vue'
+import { systemConfigApi } from '@/api/systemConfig'
 
-const authStore = useAuthStore()
-const showToast = inject('showToast')
+const API_HOST_KEY = 'api_host'
 
-const settings = reactive({
-  serverUrl: authStore.serverUrl
-})
+const mcpServerUrl = ref('')
+const originalUrl = ref('')
 
-const saveApiSettings = () => {
-  authStore.updateServerUrl(settings.serverUrl)
-  showToast('设置已保存', 'success')
+const loadMcpServerUrl = async () => {
+  try {
+    const res = await systemConfigApi.getConfig(API_HOST_KEY)
+    if (res.data && res.data.config_value) {
+      mcpServerUrl.value = res.data.config_value
+      originalUrl.value = res.data.config_value
+    }
+  } catch (e) {
+    console.error('failed to load mcp server url:', e)
+  }
+}
+
+const saveMcpServerUrl = async () => {
+  if (mcpServerUrl.value === originalUrl.value) return
+  try {
+    await systemConfigApi.updateConfig(API_HOST_KEY, mcpServerUrl.value)
+    originalUrl.value = mcpServerUrl.value
+    window.dispatchEvent(new CustomEvent('show-toast', {
+      detail: { message: 'MCP Server 地址已保存', type: 'success' }
+    }))
+  } catch (e) {
+    console.error('failed to save mcp server url:', e)
+  }
 }
 
 onMounted(() => {
-  settings.serverUrl = authStore.serverUrl
+  loadMcpServerUrl()
 })
 </script>

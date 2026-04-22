@@ -45,6 +45,7 @@ services:
     volumes:
       - ./web/admin/dist:/usr/share/nginx/html:ro
       - ./web/admin/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./web/admin/public/config.json:/usr/share/nginx/html/config.json:ro
     networks:
       - mcp-network
 
