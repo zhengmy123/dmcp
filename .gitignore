@@ -31,8 +31,7 @@ web/admin/dist
 web/admin/node_modules.worktrees/
 
 # docs
-docs/
-
+docs/superpowers/
 
 # node_modules
 node_modules
