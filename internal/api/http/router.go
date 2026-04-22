@@ -92,6 +92,7 @@ func RegisterRoutes(
 		mcpGroup.DELETE("/tools/:id", toolHandler.DeleteTool)
 
 		mcpGroup.GET("/http-services/:id/output-schema", toolHandler.GetHTTPServiceOutputSchema)
+		mcpGroup.GET("/http-services/:id/tools", toolHandler.GetHTTPServiceTools)
 
 		var db *gorm.DB
 		if gormDB != nil {

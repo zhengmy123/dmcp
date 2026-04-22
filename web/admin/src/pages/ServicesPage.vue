@@ -126,6 +126,10 @@
             class="px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
             调试
           </button>
+          <button @click="openToolsModal(service)"
+            class="px-3 py-1.5 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+            查看工具
+          </button>
         </div>
       </div>
     </div>
@@ -767,6 +771,13 @@
         </div>
       </transition>
     </teleport>
+
+    <!-- Service Tools Modal -->
+    <ServiceToolsModal
+      :visible="showToolsModal"
+      :service="selectedServiceForTools"
+      @close="showToolsModal = false"
+    />
   </div>
 </template>
 
@@ -777,6 +788,7 @@ import { servicesApi } from '@/api/services'
 import VueJsonPretty from 'vue-json-pretty'
 import 'vue-json-pretty/lib/styles.css'
 import SchemaFieldNode from '@/components/SchemaFieldNode.vue'
+import ServiceToolsModal from '@/components/ServiceToolsModal.vue'
 import {
   fieldsToSchema,
   schemaToFields,
@@ -795,6 +807,13 @@ const searchForm = reactive({
   state: ''
 })
 const pageSize = ref(10)
+const showToolsModal = ref(false)
+const selectedServiceForTools = ref(null)
+
+const openToolsModal = (service) => {
+  selectedServiceForTools.value = service
+  showToolsModal.value = true
+}
 
 const handleSearch = () => {
   servicesStore.fetchServices({

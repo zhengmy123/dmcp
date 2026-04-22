@@ -175,3 +175,42 @@ Webhook 处理器。
 | 参数 | 类型 | 必填 | 说明 |
 |------|------|------|------|
 | id | uint | 是 | 服务 ID |
+
+### GET /api/admin/http-services/:id/tools
+
+获取指定 HTTP 服务关联的工具列表。
+
+**需要认证**: 是（JWT）
+
+**路径参数**:
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| id | uint | 是 | HTTP 服务 ID |
+
+**响应示例**:
+```json
+{
+  "code": 0,
+  "message": "success",
+  "data": {
+    "service_id": 1,
+    "service_name": "用户服务",
+    "tools": [
+      { "id": 1, "name": "get_user", "description": "获取用户信息" },
+      { "id": 2, "name": "create_user", "description": "创建用户" }
+    ],
+    "count": 2
+  }
+}
+```
+
+**响应字段说明**:
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| service_id | uint | HTTP 服务 ID |
+| service_name | string | HTTP 服务名称 |
+| tools | array | 工具列表 |
+| tools[].id | uint | 工具 ID |
+| tools[].name | string | 工具名称 |
+| tools[].description | string | 工具描述 |
+| count | int | 工具数量 |

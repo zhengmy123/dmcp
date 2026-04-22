@@ -39,5 +39,10 @@ export const servicesApi = {
   // 调试服务
   debugService(id, data) {
     return request.post(`/api/v1/services/${id}/debug`, data)
+  },
+
+  // 获取 HTTP 服务关联的工具列表
+  getServiceTools(serviceId) {
+    return request.get(`/api/admin/http-services/${serviceId}/tools`)
   }
 }

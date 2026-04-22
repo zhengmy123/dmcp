@@ -386,3 +386,46 @@ func (h *ToolHandler) GetHTTPServiceOutputSchema(ctx *gin.Context) {
 		"output_schema": service.OutputSchema,
 	})
 }
+
+func (h *ToolHandler) GetHTTPServiceTools(ctx *gin.Context) {
+	idParam := ctx.Param("id")
+	id, err := strconv.ParseUint(idParam, 10, 64)
+	if err != nil {
+		response.BadRequest(ctx, "invalid service id")
+		return
+	}
+
+	service, err := h.serviceStore.Get(ctx.Request.Context(), uint(id))
+	if err != nil {
+		response.NotFound(ctx, "service not found")
+		return
+	}
+
+	serviceID := uint(id)
+	query := &repository.ToolQuery{
+		ServiceID: &serviceID,
+		State:     func() *int { v := 1; return &v }(),
+	}
+
+	tools, _, err := h.toolStore.List(ctx.Request.Context(), query, 1, 100)
+	if err != nil {
+		response.InternalError(ctx, err.Error())
+		return
+	}
+
+	items := make([]ToolItemResponse, 0, len(tools))
+	for _, t := range tools {
+		items = append(items, ToolItemResponse{
+			ID:          t.ID,
+			Name:        t.Name,
+			Description: t.Description,
+		})
+	}
+
+	response.Success(ctx, gin.H{
+		"service_id":    service.ID,
+		"service_name": service.Name,
+		"tools":        items,
+		"count":        len(items),
+	})
+}

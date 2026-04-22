@@ -208,12 +208,14 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useToolsStore } from '@/stores/tools'
 import { useToolBindingsStore } from '@/stores/toolBindings'
 import ToolEditDialog from '@/components/ToolEditDialog.vue'
 import ToolBindingDialog from '@/components/ToolBindingDialog.vue'
 
+const route = useRoute()
 const toolsStore = useToolsStore()
 const toolBindingsStore = useToolBindingsStore()
 const showToolDialog = ref(false)
@@ -222,6 +224,38 @@ const showBindingDialog = ref(false)
 const selectedToolForBinding = ref(null)
 const searchInput = ref('')
 const saveError = ref('')
+
+const checkEditId = () => {
+  const editId = route.query.editId
+  if (editId) {
+    const tool = toolsStore.tools.find(t => String(t.id) === String(editId))
+    if (tool) {
+      editingTool.value = { ...tool }
+      showToolDialog.value = true
+    }
+  }
+}
+
+watch(() => route.query.editId, (newEditId) => {
+  if (newEditId && toolsStore.tools.length > 0) {
+    const tool = toolsStore.tools.find(t => String(t.id) === String(newEditId))
+    if (tool) {
+      editingTool.value = { ...tool }
+      showToolDialog.value = true
+    }
+  }
+})
+
+watch(() => toolsStore.tools, () => {
+  const editId = route.query.editId
+  if (editId && !showToolDialog.value) {
+    const tool = toolsStore.tools.find(t => String(t.id) === String(editId))
+    if (tool) {
+      editingTool.value = { ...tool }
+      showToolDialog.value = true
+    }
+  }
+})
 
 const totalPages = computed(() => {
   return Math.ceil(toolsStore.pagination.total / toolsStore.pagination.pageSize) || 1
@@ -326,7 +360,9 @@ const handleDelete = async (tool) => {
 }
 
 onMounted(() => {
-  toolsStore.fetchToolsForAdmin()
+  toolsStore.fetchToolsForAdmin().then(() => {
+    checkEditId()
+  })
 })
 </script>
 
