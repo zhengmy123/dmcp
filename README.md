@@ -16,10 +16,10 @@ make up
 
 # 其他命令
 make logs          # 查看日志
-make down          # 停止服务
-make restart       # 重启服务
-make ps            # 查看状态
-make clean         # 清理
+make down           # 停止服务
+make restart        # 重启服务
+make ps             # 查看状态
+make clean          # 清理
 ```
 
 ### Docker Compose 手动操作
@@ -36,24 +36,24 @@ docker-compose logs -f
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    MCP Client                        │
+│                    MCP Client                       │
 └─────────────────────────┬───────────────────────────┘
                           │ HTTP/MCP Protocol
                           ▼
 ┌─────────────────────────────────────────────────────┐
-│              MCP Server (:18080)                      │
+│              MCP Server (:18080)                     │
 │  ┌─────────────────────────────────────────────┐    │
-│  │  Gin HTTP Engine + Token Auth Middleware     │    │
+│  │  Gin HTTP Engine + Token Auth Middleware    │    │
 │  └─────────────────────────────────────────────┘    │
 │                        │                             │
-│  ┌─────────────────────▼────────────────────────┐   │
-│  │    Dynamic Registry (MySQL Store)            │   │
+│  ┌─────────────────────▼────────────────────────┐    │
+│  │    Dynamic Registry (MySQL Store)            │    │
 │  └─────────────────────────────────────────────┘    │
 └─────────────────────────┬───────────────────────────┘
                           │
 ┌─────────────────────────▼───────────────────────────┐
 │                  MySQL (:3306)                       │
-│  mcp_tool_definitions / mcp_auth_keys / mcp_http_svcs │
+│  mcp_tool_definitions / mcp_auth_keys / mcp_http_svcs│
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -69,23 +69,39 @@ docker-compose logs -f
 
 ```
 .
-├── cmd/server/           # 服务入口
+├── cmd/server/              # 服务入口
 ├── internal/
-│   ├── auth/            # 认证管理
-│   ├── config/          # 配置管理
-│   ├── httpservice/     # HTTP 服务
-│   ├── runtime/         # 运行时
-│   └── tooldef/         # 工具定义
-├── web/admin/           # Vue3 前端
-├── docs/
-│   ├── architecture.md  # 架构文档
-│   └── mysql_migration.sql  # 数据库初始化
-├── docker-compose.yml   # 生产配置
-├── docker-compose.dev.yml # 开发配置
-├── Dockerfile           # 生产镜像
-├── Dockerfile.dev       # 开发镜像
-├── .air.toml           # 热更新配置
-└── Makefile            # 管理脚本
+│   ├── api/http/            # API 层（HTTP 处理器、路由）
+│   │   ├── handler/         # HTTP 处理器
+│   │   └── middleware/      # 中间件
+│   ├── domain/              # 领域层（领域模型、仓储接口、领域服务）
+│   │   ├── model/           # 领域模型
+│   │   ├── repository/     # 仓储接口
+│   │   └── service/         # 领域服务
+│   ├── infrastructure/       # 基础设施层（数据库、缓存、认证）
+│   │   ├── auth/            # 认证实现
+│   │   ├── database/        # 数据库实现（GORM）
+│   │   └── store/           # 存储实现
+│   ├── service/             # 应用服务层
+│   ├── common/              # 公共组件（日志、中间件、响应）
+│   │   ├── cache/           # 缓存组件
+│   │   ├── logger/          # 日志组件
+│   │   ├── middleware/      # 公共中间件
+│   │   └── response/        # 响应处理
+│   └── config/              # 配置管理
+├── web/admin/               # Vue3 前端管理后台
+├── docs/                    # 文档目录
+│   ├── api/                 # API 接口文档
+│   ├── plans/              # 开发计划
+│   └── superpowers/         # 功能规格
+├── test/                    # 测试目录（遵循 DDD 结构）
+├── scripts/                 # 脚本工具
+├── docker-compose.yml       # 生产配置
+├── docker-compose.dev.yml   # 开发配置
+├── Dockerfile               # 生产镜像
+├── Dockerfile.dev           # 开发镜像
+├── Makefile                 # 管理脚本
+└── AGENTS.md               # AI Agent 开发规范
 ```
 
 ## API 接口
@@ -106,7 +122,10 @@ MCP 服务按 `vauth_key` 进行分组隔离，每个分组有独立的 MCP Serv
 
 | 路由 | 说明 |
 |------|------|
+| `/api/v1/servers` | MCP Server 管理（增删改查） |
 | `/api/v1/services` | HTTP 服务管理（增删改查） |
+| `/api/v1/tools` | 工具定义管理（增删改查） |
+| `/api/v1/tool-bindings` | 工具绑定管理（绑定/解绑工具与服务） |
 | `/api/v1/execute/:id` | 服务执行 |
 | `/api/v1/auth/tokens` | Token 管理（增删改、启用/禁用、刷新） |
 | `/api/v1/users` | 用户管理（仅管理员） |
@@ -141,3 +160,29 @@ make db-init
 # 方式2: Docker exec
 docker-compose exec -T mysql mysql -uroot -p1234qwer mcp_server < docs/mysql_migration.sql
 ```
+
+## 测试
+
+```bash
+# 启动依赖服务
+docker-compose -f docker-compose.test.yml up -d
+
+# 运行测试
+go test -v ./test/...
+
+# 测试完成后停止依赖服务
+docker-compose -f docker-compose.test.yml down
+```
+
+## 开发规范
+
+项目遵循 DDD（领域驱动设计）分层架构，详细规范请参考 [AGENTS.md](AGENTS.md)。
+
+### 核心规范
+
+- 所有删除操作均为软删除，通过 `state` 字段区分（1-正常，0-删除）
+- 批量操作采用「先批量查询，再分三种情况处理」模式
+- Infrastructure 层查询泛化，query 参数为结构体指针
+- JSON 处理使用 `sonic` 库
+- 错误处理必须 wrapping，不得忽略 error
+- MCP 调试统一使用 POST 方法
